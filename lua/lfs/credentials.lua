@@ -1,0 +1,2 @@
+SSID = "TrojanischesZebra"
+PASSWORD = "mongolan"
