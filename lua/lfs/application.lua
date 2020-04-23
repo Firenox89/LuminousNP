@@ -1,25 +1,53 @@
 ws2812.init()
-levelCount = 4
-ledCountPerLevel = 47
-ledLevelBuffer = {}
-effectCoroutineLevels = {}
+local levelCount = 4
+local ledCountPerLevel = 47
+local ledLevelBuffer = {}
+local effectCoroutineLevels = {}
 
 local effectCoroutineAll
-completeLEDBuffer = ws2812.newBuffer(levelCount * ledCountPerLevel, 4)
+local completeLEDBuffer = ws2812.newBuffer(levelCount * ledCountPerLevel, 4)
 
-webHeader = "<html> <body> <a href=\"off?level=0\"><button>All Off</button></a>"
-formPart1 = "<h2>Level " --level
-formPart2 = "</h2><a href=\"off?level=" --level
-formPart3 = "\"><button>Off</button></a><br><br> <form action=\"/fill\" method=\"get\"> <label for=\"color\">Color:</label>"
-formPart4 = "<input type=\"color\" id=\"color\" name=\"color\" value=\"#" --color
-formPart5 = "\"><br><br> <label for=\"white\">White:</label> <input type=\"range\" id=\"white\" name=\"white\" value=\"" --white
-formPart6 = "\" min=\"0\" max=\"255\"><br><br> <input type=\"hidden\" id=\"level\" name=\"level\" value=\"" --level
-formPart7 = "\"><input type=\"submit\" value=\"Update\"></form>"
-webFooter = "</body> </html>"
+local webHeader = "<html> <body>"
+local offButton = "<h2>Level %01d</h2>" ..
+"<a href=\"off?level=%01d\"><button>Off</button></a><br><br>"
+local effectForm = "<form action=\"/effect\" method=\"get\">" ..
+"<label for=\"effect\">Choose a effect:</label>" ..
+"<select id=\"effect\" name=\"effect\">" ..
+"<option value=\"rainbow\">Rainbow</option>" ..
+"<option value=\"rainbowroad\">RainbowRoad</option>" ..
+"</select>" ..
+"<input type=\"hidden\" id=\"level\" name=\"level\" value=\"%01d\">" ..
+"<input type=\"submit\" value=\"Apply\">" ..
+"</form>"
+local colorForm = "<form action=\"/fill\" method=\"get\">" ..
+"<label for=\"color\">Color:</label>" ..
+"<input type=\"color\" id=\"color\" name=\"color\" value=\"#%02X%02X%02X\"><br><br>" ..
+"<label for=\"white\">White:</label> <input type=\"range\" id=\"white\" name=\"white\" value=\"%01d\" min=\"0\" max=\"255\"><br><br>" ..
+"<input type=\"hidden\" id=\"level\" name=\"level\" value=\"%01d\">" ..
+"<input type=\"submit\" value=\"Update\">" ..
+"</form>"
+local webFooter = "</body> </html>"
 
 for i = 1, levelCount do
     ledLevelBuffer[i] = ws2812.newBuffer(ledCountPerLevel,4)
     effectCoroutineLevels[i] = nil
+end
+
+function sendPage(res)
+    buf = webHeader
+    buf = buf .. string.format(offButton, 0, 0)
+    buf = buf .. string.format(effectForm, 0)
+    g, r, b, w = completeLEDBuffer:get(1)
+    buf = buf .. string.format(colorForm, r, g, b, w, 0)
+    for level = levelCount, 1, -1 do
+        g, r, b, w = ledLevelBuffer[level]:get(1)
+        buf = buf .. string.format(offButton, level, level)
+        buf = buf .. string.format(effectForm, level)
+        buf = buf .. string.format(colorForm, r, g, b, w, level)
+    end
+    buf = buf .. webFooter
+
+    res:send(buf)
 end
 
 function rainbow(level)
@@ -28,10 +56,37 @@ function rainbow(level)
         saturation = 255
         brightness = 255
         while ( true ) do
-            hue = (hue + 7) % 360
+            hue = (hue + 1) % 360
             g, r, b, w = color_utils.hsv2grbw(hue, saturation, brightness)
             updateAndFlashLevelBuffer(level, function (buffer)
                 buffer:fill(g, r, b, w)
+            end)
+            coroutine.yield()
+        end
+    end)
+    return co
+end
+
+function rainbowRoad(level)
+    co = coroutine.create(function ()
+        hue = 0
+        saturation = 255
+        brightness = 255
+        bufferFilled = false
+        while ( true ) do
+            updateAndFlashLevelBuffer(level, function (buffer)
+                if (bufferFilled) then
+                    buffer:shift(1, ws2812.SHIFT_CIRCULAR)
+                else
+                    inc = 360 / buffer:size()
+                    for i = 1, buffer:size() do
+                        hue = (i * inc) % 360
+                        g, r, b, w = color_utils.hsv2grbw(hue, saturation, brightness)
+                        buffer:set(i, g, r, b, w)
+                    end
+                    bufferFilled = true
+                    print("buffer filled")
+                end
             end)
             coroutine.yield()
         end
@@ -70,18 +125,6 @@ function updateAndFlashLevelBuffer(level, bufferModifyFunc)
     ws2812.write(completeLEDBuffer)
 end
 
-function sendPage(res)
-    white = 255
-    colorString = "ff0000"
-    buf = webHeader
-    for level = 1, levelCount do
-        buf = buf .. formPart1 .. level .. formPart2 .. level .. formPart3 .. formPart4 .. colorString .. formPart5 .. white .. formPart6 .. level .. formPart7
-    end
-    buf = buf .. webFooter
-
-    res:send(buf)
-end
-
 function setupWebServer()
     print("setup webserver")
     dofile('httpServer.lua')
@@ -94,6 +137,15 @@ function setupWebServer()
     httpServer:use('/OTA', function(req, res)
         LFS.HTTP_OTA("sirmixalot", "/", "lfs.img")
         res:send('Fetching')
+    end)
+
+    httpServer:use('/debugStrings', function(req, res)
+        do
+            local a=debug.getstrings'RAM'
+            for i =1, #a do a[i] = ('%q'):format(a[i]) end
+            print ('local preload='..table.concat(a,','))
+        end
+        res:send('Done')
     end)
 
     httpServer:use('/off', function(req, res)
@@ -111,6 +163,7 @@ function setupWebServer()
         end)
         sendPage(res)
     end)
+
     httpServer:use('/fill', function(req, res)
         rawColor = req.query.color
         level = tonumber(req.query.level)
@@ -118,7 +171,7 @@ function setupWebServer()
         g = tonumber(rawColor:sub(4, 5),16)
         b = tonumber(rawColor:sub(6, 7),16)
         w = tonumber(req.query.white)
-        print(string.format("Level %01d RGBW %03d/%03d/%03d/%03d", level, r, g, b, w))
+        print(string.format("Fill Level %01d RGBW %03d/%03d/%03d/%03d", level, r, g, b, w))
         if r and r >= 0 and r <= 255
             and b and b >= 0 and b <= 255
             and g and g >= 0 and g <= 255
@@ -132,16 +185,27 @@ function setupWebServer()
         end
         sendPage(res)
     end)
-    httpServer:use('/rainbow', function(req, res)
+
+    httpServer:use('/effect', function(req, res)
         level = tonumber(req.query.level)
+        effect = req.query.effect
+        print(effect)
         if level == nil then
             level = 0
         end
-        print("set rainbow for " .. level)
-        if level == 0 then
-            effectCoroutineAll =  rainbow(level)
-        else
-            effectCoroutineLevels[level] = rainbow(level)
+        local effectFunc
+        if effect == "rainbow" then
+            effectFunc = rainbow
+        elseif effect == "rainbowroad" then
+            effectFunc = rainbowRoad
+        end
+        if effectFunc ~= nil then
+            print("set " .. effect .. " for " .. level)
+            if level == 0 then
+                effectCoroutineAll = effectFunc(level)
+            else
+                effectCoroutineLevels[level] = effectFunc(level)
+            end
         end
         sendPage(res)
     end)
