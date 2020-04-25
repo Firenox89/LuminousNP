@@ -2,6 +2,10 @@
 luac.out
 lfs.img
 
+# web stuff
+.idea
+*.gz
+
 # luarocks build files
 *.src.rock
 *.zip
