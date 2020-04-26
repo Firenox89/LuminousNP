@@ -1,122 +1,4 @@
-ws2812.init()
-local levelCount = 4
-local ledCountPerLevel = 47
-ledLevelBuffer = {}
-local effectCoroutineLevels = {}
-
-ledLevelBuffer[0] = ws2812.newBuffer(levelCount * ledCountPerLevel, 4)
-
-for i = 1, levelCount do
-    ledLevelBuffer[i] = ws2812.newBuffer(ledCountPerLevel,4)
-    effectCoroutineLevels[i] = nil
-end
-
-function rainbow(level)
-    co = coroutine.create(function ()
-        hue = 0
-        saturation = 255
-        brightness = 255
-        while ( true ) do
-            hue = (hue + 1) % 360
-            g, r, b, w = color_utils.hsv2grbw(hue, saturation, brightness)
-            updateAndFlashLevelBuffer(level, function (buffer)
-                buffer:fill(g, r, b, w)
-            end)
-            coroutine.yield()
-        end
-    end)
-    return co
-end
-
-function rainbowRoad(level)
-    co = coroutine.create(function ()
-        while ( true ) do
-            updateAndFlashLevelBuffer(level, function (buffer)
-                if (bufferFilled) then
-                    buffer:shift(1, ws2812.SHIFT_CIRCULAR)
-                else
-                    hue = 0
-                    saturation = 255
-                    brightness = 255
-                    bufferFilled = false
-                    inc = 360 / buffer:size()
-                    for i = 1, buffer:size() do
-                        hue = (i * inc) % 360
-                        g, r, b, w = color_utils.hsv2grbw(hue, saturation, brightness)
-                        buffer:set(i, g, r, b, w)
-                    end
-                    bufferFilled = true
-                    print("buffer filled")
-                end
-            end)
-            coroutine.yield()
-        end
-    end)
-    return co
-end
-
-function rainbowSnake(level)
-    co = coroutine.create(function ()
-        bufferFilled = false
-        while ( true ) do
-            updateAndFlashLevelBuffer(level, function (buffer)
-                if (bufferFilled) then
-                    buffer:shift(1, ws2812.SHIFT_CIRCULAR)
-                else
-                    hue = 0
-                    saturation = 255
-                    brightness = 255
-                    inc = 10
-                    for i = 1, 36 do
-                        hue = (i * inc) % 360
-                        g, r, b, w = color_utils.hsv2grbw(hue, saturation, brightness)
-                        buffer:set(i, g, r, b, w)
-                    end
-                    bufferFilled = true
-                    print("buffer filled")
-                end
-            end)
-            coroutine.yield()
-        end
-    end)
-    return co
-end
-
-function runningLight(level)
-    co = coroutine.create(function ()
-        bufferFilled = false
-        while ( true ) do
-            updateAndFlashLevelBuffer(level, function (buffer)
-                if (bufferFilled) then
-                    buffer:shift(1, ws2812.SHIFT_CIRCULAR)
-                else
-                    g, r, b, w = buffer:get(1)
-                    for i = 0, 5 do
-                        brightness = 5 + (i * 50)
-                        g, r, b, w = color_utils.hsv2grbw(0, 255, brightness)
-                        buffer:set(i+1, g, r, b, w)
-                    end
-                    bufferFilled = true
-                    print("buffer filled")
-                end
-            end)
-            coroutine.yield()
-        end
-    end)
-    return co
-end
-
-function updateAndFlashLevelBuffer(level, bufferModifyFunc)
-    local buffer
-    buffer = ledLevelBuffer[level]
-    bufferModifyFunc(buffer)
-    if level ~= 0 then
-        offset = ledCountPerLevel*(level-1) + 1
-        ledLevelBuffer[0]:replace(buffer, offset)
-    end
-    ws2812.write(ledLevelBuffer[0])
-    ws2812.write(ledLevelBuffer[0])
-end
+LEDs = require 'LED_control'
 
 function setupWebServer()
     print("setup webserver")
@@ -130,9 +12,8 @@ function setupWebServer()
         res:send('Fetching')
     end)
 
-    httpServer:use('/telnet', function(req, res)
-        LFS.telnet()
-        res:send('Telnet started')
+    httpServer:use('/test', function(req, res)
+        res:send('Test')
     end)
 
     httpServer:use('/debugStrings', function(req, res)
@@ -149,17 +30,8 @@ function setupWebServer()
         if level == nil then
             level = 0
         end
+        LEDs.on(level)
 
-        if level == 0 then
-            for i = 0, levelCount do
-                effectCoroutineLevels[i] = nil
-            end
-        else
-            effectCoroutineLevels[level] = nil
-        end
-        updateAndFlashLevelBuffer(level, function (buffer)
-            buffer:fill(0, 0, 0, 255)
-        end)
         res:send(200)
     end)
 
@@ -169,16 +41,7 @@ function setupWebServer()
             level = 0
         end
 
-        if level == 0 then
-            for i = 0, levelCount do
-                effectCoroutineLevels[i] = nil
-            end
-        else
-            effectCoroutineLevels[level] = nil
-        end
-        updateAndFlashLevelBuffer(level, function (buffer)
-            buffer:fill(0, 0, 0, 0)
-        end)
+        LEDs.off(level)
         res:send(200)
     end)
 
@@ -195,16 +58,13 @@ function setupWebServer()
             and w and w >= 0 and w <= 255
             and level and level >= 0 and level <= 4
             then
-            updateAndFlashLevelBuffer(level, function (buffer)
-                print(string.format("Fill Level %01d RGBW %03d/%03d/%03d/%03d", level, r, g, b, w))
-                buffer:fill(g, r, b, w)
-            end)
+            LEDs.fill(level, g, r, b, w)
         end
         res:send(200)
     end)
 
     httpServer:use('/effects', function(req, res)
-        effectJson = "[\"Rainbow\", \"Rainbow Road\", \"Rainbow Snake\", \"Running Light\"]"
+        effectJson = "[\"Rainbow\", \"Rainbow Road\", \"Rainbow Snake\", \"Running Light\", \"Pulsing Light\"]"
         res:send(effectJson)
     end)
 
@@ -215,35 +75,42 @@ function setupWebServer()
         r = tonumber(rawColor:sub(1, 2),16)
         g = tonumber(rawColor:sub(3, 4),16)
         b = tonumber(rawColor:sub(5, 6),16)
-        --hue, sat, bri = color_utils.grb2hsv(50,15,200)
+        hue, sat, bri = color_utils.grb2hsv(g, r, b)
         if level == nil then
             level = 0
         end
-        if level == 0 then
-            for i = 0, levelCount do
-                effectCoroutineLevels[i] = nil
-            end
-        end
         print("set " .. effect or "no effect" .. " for " .. level)
         if effect == "Rainbow" then
-            effectCoroutineLevels[level] = rainbow(level)
+            LEDs.setRainbow(level)
         elseif effect == "Rainbow Road" then
-            effectCoroutineLevels[level] = rainbowRoad(level)
+            LEDs.setRainbowRoad(level)
         elseif effect == "Rainbow Snake" then
-            effectCoroutineLevels[level] = rainbowSnake(level)
+            LEDs.setRainbowSnake(level)
         elseif effect == "Running Light" then
-            effectCoroutineLevels[level] = runningLight(level)
+            LEDs.setRunningLight(level, hue)
+        elseif effect == "Pulsing Light" then
+            LEDs.setPulsingLight(level, hue)
         end
         res:send(200)
     end)
 end
 
-function effectLoop()
-    for i = 0, levelCount do
-        effectCoroutine = effectCoroutineLevels[i]
-        if effectCoroutine ~= nil then
-            coroutine.resume(effectCoroutine)
+function printDump(o)
+    print(dump(o))
+end
+
+function dump(o)
+    print("dump")
+    print(o)
+    if type(o) == 'table' then
+        local s = '{ '
+        for k,v in pairs(o) do
+            if type(k) ~= 'number' then k = '"'..k..'"' end
+            s = s .. '['..k..'] = ' .. dump(v) .. ','
         end
+        return s .. '} '
+    else
+        return tostring(o)
     end
 end
 
@@ -252,8 +119,7 @@ if file.exists("OTA.update") then
     file.remove("OTA.update")
     LFS.HTTP_OTA("sirmixalot", "/", "lfs.img")
 else
-    tmr.create():alarm(50, tmr.ALARM_AUTO, effectLoop)
-
+    LEDs.init()
     setupWebServer()
 end
 
