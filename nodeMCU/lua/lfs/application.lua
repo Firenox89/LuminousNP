@@ -51,14 +51,12 @@ function setupWebServer()
         r = tonumber(rawColor:sub(1, 2),16)
         g = tonumber(rawColor:sub(3, 4),16)
         b = tonumber(rawColor:sub(5, 6),16)
-        w = tonumber(req.query.white)
         if r and r >= 0 and r <= 255
             and b and b >= 0 and b <= 255
             and g and g >= 0 and g <= 255
-            and w and w >= 0 and w <= 255
             and level and level >= 0 and level <= 4
             then
-            LEDs.fill(level, g, r, b, w)
+            LEDs.fill(level, r, g, b)
         end
         res:send(200)
     end)
@@ -93,6 +91,21 @@ function setupWebServer()
         end
         res:send(200)
     end)
+
+    httpServer:use('/presets', function(req, res)
+        effectJson = "[\"Rainbow\", \"Rainbow Road\", \"Rainbow Snake\", \"Running Light\", \"Pulsing Light\"]"
+        res:send(effectJson)
+    end)
+
+    httpServer:use('/loadPreset', function(req, res)
+        preset = req.query.preset
+        print("Load " .. preset)
+    end)
+
+    httpServer:use('/savePreset', function(req, res)
+        preset = req.query.preset
+        print("Save " .. preset)
+    end)
 end
 
 function printDump(o)
@@ -114,12 +127,39 @@ function dump(o)
     end
 end
 
+function UDPSocket()
+    print("Start UDP")
+    local udpSocket = net.createUDPSocket()
+    udpSocket:dns("nodemcu-controller", function(conn, ip)
+        print("Found controller ip "..ip)
+        udpSocket:on("receive", function(s, data, port, ip)
+            --print(string.byte(data, 1, string.len(data)))
+
+            if string.len(data) % 5 ~= 0 then
+                udpSocket:send(1234, ip, "error: invalid data size")
+            else
+                for i = 0, string.len(data)/5 - 1 do
+                    local ledid = string.byte(data, i*5 + 1)
+                    local r = string.byte(data, i*5 + 2)
+                    local g = string.byte(data, i*5 + 3)
+                    local b = string.byte(data, i*5 + 4)
+                    local w = string.byte(data, i*5 + 5)
+                    --print(string.format("Set %d %d %d %d %d ", ledid, r, g, b, w))
+                    LEDs.updateRGBW(ledid, g, r, b, w)
+                end
+            end
+        end)
+        udpSocket:send(1234, ip, "{controller: 1, ledcount: 188, bytesperled: 4}")
+    end)
+end
+
 if file.exists("OTA.update") then
     print("OTA file exists")
     file.remove("OTA.update")
     LFS.HTTP_OTA("sirmixalot", "/", "lfs.img")
 else
     LEDs.init()
+    UDPSocket()
     setupWebServer()
 end
 

@@ -12,6 +12,21 @@ for i = 1, levelCount do
     effectCoroutineLevels[i] = nil
 end
 
+function RGB2RGBW(r, g, b)
+    local cg, cr, cb, cw
+    if (r ~= g or r ~= b) then
+        local hue, saturation, brightness
+        hue, saturation, brightness = color_utils.grb2hsv(g, r, b)
+        cg, cr, cb, cw = color_utils.hsv2grbw(hue, saturation, brightness)
+    else
+        cr = r
+        cg = r
+        cb = r
+        cw = r
+    end
+    return cg, cr, cb, cw
+end
+
 function rainbow(level)
     co = coroutine.create(function ()
         local hue = 0
@@ -149,14 +164,19 @@ function init()
 end
 
 function on(level)
-    fill(level, 0, 0, 0, 255)
+    fillRGBW(level, 0, 0, 0, 255)
 end
 
 function off(level)
-    fill(level, 0, 0, 0, 0)
+    fillRGBW(level, 0, 0, 0, 0)
 end
 
-function fill(level, g, r, b, w)
+function fillRGB(level, g, r, b)
+    cg, cr, cb, cw = RGB2RGBW(g, r, b)
+    fillRGBW(level, cg, cr, cb, cw)
+end
+
+function fillRGBW(level, g, r, b, w)
     print(string.format("Fill Level %01d RGBW %03d/%03d/%03d/%03d", level, r, g, b, w))
     if level == 0 then
         for i = 0, levelCount do
@@ -168,6 +188,14 @@ function fill(level, g, r, b, w)
     updateLevelBuffer(level, function (buffer)
         buffer:fill(g, r, b, w)
     end)
+end
+
+function updateRGBW(index, g, r, b, w)
+    for i = 0, levelCount do
+        effectCoroutineLevels[i] = nil
+    end
+    ledLevelBuffer[0]:set(index, g, r, b, w)
+    ws2812.write(ledLevelBuffer[0])
 end
 
 function setEffect(effectCoroutine)
@@ -203,7 +231,8 @@ return {
     init = init,
     on = on,
     off = off,
-    fill = fill,
+    fill = fillRGB,
+    updateRGBW = updateRGBW,
     setRainbow = setRainbow,
     setRainbowRoad = setRainbowRoad,
     setRainbowSnake = setRainbowSnake,
