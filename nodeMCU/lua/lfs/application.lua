@@ -18,9 +18,11 @@ function setupWebServer()
 
     httpServer:use('/debugStrings', function(req, res)
         do
-            local a=debug.getstrings'RAM'
-            for i =1, #a do a[i] = ('%q'):format(a[i]) end
-            print ('local preload='..table.concat(a,','))
+            local a = debug.getstrings 'RAM'
+            for i = 1, #a do
+                a[i] = ('%q'):format(a[i])
+            end
+            print('local preload=' .. table.concat(a, ','))
         end
         res:send('Done')
     end)
@@ -48,14 +50,14 @@ function setupWebServer()
     httpServer:use('/fill', function(req, res)
         level = tonumber(req.query.level)
         rawColor = req.query.color
-        r = tonumber(rawColor:sub(1, 2),16)
-        g = tonumber(rawColor:sub(3, 4),16)
-        b = tonumber(rawColor:sub(5, 6),16)
+        r = tonumber(rawColor:sub(1, 2), 16)
+        g = tonumber(rawColor:sub(3, 4), 16)
+        b = tonumber(rawColor:sub(5, 6), 16)
         if r and r >= 0 and r <= 255
-            and b and b >= 0 and b <= 255
-            and g and g >= 0 and g <= 255
-            and level and level >= 0 and level <= 4
-            then
+                and b and b >= 0 and b <= 255
+                and g and g >= 0 and g <= 255
+                and level and level >= 0 and level <= 4
+        then
             LEDs.fill(level, r, g, b)
         end
         res:send(200)
@@ -70,9 +72,9 @@ function setupWebServer()
         level = tonumber(req.query.level)
         effect = req.query.effect
         rawColor = req.query.color
-        r = tonumber(rawColor:sub(1, 2),16)
-        g = tonumber(rawColor:sub(3, 4),16)
-        b = tonumber(rawColor:sub(5, 6),16)
+        r = tonumber(rawColor:sub(1, 2), 16)
+        g = tonumber(rawColor:sub(3, 4), 16)
+        b = tonumber(rawColor:sub(5, 6), 16)
         hue, sat, bri = color_utils.grb2hsv(g, r, b)
         if level == nil then
             level = 0
@@ -106,6 +108,22 @@ function setupWebServer()
         preset = req.query.preset
         print("Save " .. preset)
     end)
+
+    httpServer:use('/startStream', function(req, res)
+        openUDPSocket()
+    end)
+
+    registerAtController()
+end
+
+function registerAtController()
+    print("register at controller")
+    local socket = net.createConnection()
+    socket:on("connection", function(sck, c)
+        print("controller connected")
+        socket:send('{"id": 1, "ledCount": 188, "bytesPerLed": 4}')
+    end)
+    socket:connect(4488, "nodemcu-controller")
 end
 
 function printDump(o)
@@ -117,9 +135,11 @@ function dump(o)
     print(o)
     if type(o) == 'table' then
         local s = '{ '
-        for k,v in pairs(o) do
-            if type(k) ~= 'number' then k = '"'..k..'"' end
-            s = s .. '['..k..'] = ' .. dump(v) .. ','
+        for k, v in pairs(o) do
+            if type(k) ~= 'number' then
+                k = '"' .. k .. '"'
+            end
+            s = s .. '[' .. k .. '] = ' .. dump(v) .. ','
         end
         return s .. '} '
     else
@@ -127,29 +147,29 @@ function dump(o)
     end
 end
 
-function UDPSocket()
+function openUDPSocket()
     print("Start UDP")
     local udpSocket = net.createUDPSocket()
     udpSocket:dns("nodemcu-controller", function(conn, ip)
-        print("Found controller ip "..ip)
+        print("Found controller ip " .. ip)
         udpSocket:on("receive", function(s, data, port, ip)
             --print(string.byte(data, 1, string.len(data)))
 
             if string.len(data) % 5 ~= 0 then
                 udpSocket:send(1234, ip, "error: invalid data size")
             else
-                for i = 0, string.len(data)/5 - 1 do
-                    local ledid = string.byte(data, i*5 + 1)
-                    local r = string.byte(data, i*5 + 2)
-                    local g = string.byte(data, i*5 + 3)
-                    local b = string.byte(data, i*5 + 4)
-                    local w = string.byte(data, i*5 + 5)
+                for i = 0, string.len(data) / 5 - 1 do
+                    local ledid = string.byte(data, i * 5 + 1)
+                    local r = string.byte(data, i * 5 + 2)
+                    local g = string.byte(data, i * 5 + 3)
+                    local b = string.byte(data, i * 5 + 4)
+                    local w = string.byte(data, i * 5 + 5)
                     --print(string.format("Set %d %d %d %d %d ", ledid, r, g, b, w))
                     LEDs.updateRGBW(ledid, g, r, b, w)
                 end
             end
         end)
-        udpSocket:send(1234, ip, "{controller: 1, ledcount: 188, bytesperled: 4}")
+        udpSocket:send(1234, ip, "{id: 1, ledCount: 188, bytesPerLed: 4}")
     end)
 end
 
@@ -159,7 +179,6 @@ if file.exists("OTA.update") then
     LFS.HTTP_OTA("sirmixalot", "/", "lfs.img")
 else
     LEDs.init()
-    UDPSocket()
     setupWebServer()
 end
 
