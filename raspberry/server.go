@@ -9,6 +9,15 @@ import (
 	"time"
 )
 
+type ConnectedNodeMCU struct {
+	IP          string
+	ID          int
+	LedCount    int
+	BytesPerLED int
+}
+
+var connectedMCUs = make([]ConnectedNodeMCU, 0)
+
 func main() {
 	go serveWeb()
 
@@ -18,6 +27,7 @@ func main() {
 
 type SetConfigRequest struct {
 	Config LEDConfig `json:"config"`
+	Nodes  []Node    `json:"nodes"`
 }
 
 type LEDConfig struct {
@@ -27,23 +37,79 @@ type LEDConfig struct {
 	Effect   int    `json:"effect"`
 }
 
+type Node struct {
+	ID int `json:"ID"`
+}
+
 func serveWeb() {
 	http.HandleFunc("/setConfig", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+		w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+
+		if r.Method == "OPTIONS" {
+			return
+		}
 		log.Printf("got %v", r.Body)
 
 		decoder := json.NewDecoder(r.Body)
 		var config SetConfigRequest
 		err := decoder.Decode(&config)
 		if err != nil {
-			panic(err)
+			w.WriteHeader(500)
+		} else {
+			log.Printf("got %v", config)
+			log.Printf("got %s", config.Config.Color)
+			sendNodeConfig(config)
 		}
-		log.Printf("got %v", config)
-		log.Printf("got %s", config.Config.Color)
 	})
 
+	http.HandleFunc("/getConnectedNodeMCUs", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Content-Type", "application/json")
+		err := json.NewEncoder(w).Encode(connectedMCUs)
+		if err != nil {
+			log.Fatal(err)
+		}
+	})
 	http.Handle("/", http.FileServer(http.Dir("raspberry/web/dist")))
 
 	log.Fatal(http.ListenAndServe(":8081", nil))
+}
+
+func sendNodeConfig(config SetConfigRequest) {
+	var nodesToSendTo []ConnectedNodeMCU
+	for _, nodeInConfig := range config.Nodes {
+		for _, connectedNode := range connectedMCUs {
+			if connectedNode.ID == nodeInConfig.ID {
+				nodesToSendTo = append(nodesToSendTo, connectedNode)
+				break
+			}
+		}
+	}
+	for _, nodeToSendTo := range nodesToSendTo {
+		var req *http.Request
+		var err error
+		if !config.Config.Power {
+			req, err = http.NewRequest("POST", "http://"+nodeToSendTo.IP+"/off", nil)
+
+			if err != nil {
+				log.Printf("Failed to create request", err)
+			}
+		} else {
+			req, err = http.NewRequest("POST", "http://"+nodeToSendTo.IP+"/on", nil)
+
+			if err != nil {
+				log.Printf("Failed to create request", err)
+			}
+		}
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			panic(err)
+		}
+		resp.Body.Close()
+	}
 }
 
 func startUDPServer() {
@@ -113,6 +179,8 @@ func parseRegistration(buffer []byte, ip string) {
 		log.Fatal(err)
 	} else {
 		log.Printf("NodeMCU registered %s %v", ip, request)
+
+		connectedMCUs = append(connectedMCUs, ConnectedNodeMCU{IP: ip, ID: request.ID, LedCount: request.LedCount, BytesPerLED: request.BytesPerLED})
 	}
 }
 

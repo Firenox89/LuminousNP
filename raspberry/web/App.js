@@ -2,22 +2,20 @@ import React from 'react';
 import {makeStyles} from '@material-ui/core/styles';
 
 import {Button, Container} from '@material-ui/core';
-import Card from '@material-ui/core/Card';
-import CardContent from '@material-ui/core/CardContent';
-import Typography from '@material-ui/core/Typography';
-import Checkbox from "@material-ui/core/Checkbox";
-
-import FormControlLabel from "@material-ui/core/FormControlLabel";
-import FormControl from "@material-ui/core/FormControl";
-import InputLabel from "@material-ui/core/InputLabel";
-import Select from "@material-ui/core/Select";
-import MenuItem from "@material-ui/core/MenuItem";
-
-import {HuePicker} from 'react-color'
+import {LEDConfig} from './LEDConfig'
+import List from '@material-ui/core/List';
+import ListItem from '@material-ui/core/ListItem';
+import ListItemIcon from '@material-ui/core/ListItemIcon';
+import ListItemText from '@material-ui/core/ListItemText';
+import Checkbox from '@material-ui/core/Checkbox';
+import Card from "@material-ui/core/Card";
+import CardContent from "@material-ui/core/CardContent";
+import Typography from "@material-ui/core/Typography";
 
 const useStyles = makeStyles(theme => ({
     root: {
         width: 400,
+        margin: 16,
     },
     bullet: {
         display: 'inline-block',
@@ -50,6 +48,31 @@ export default function App() {
     const [useWhite, setUseWhite] = React.useState(true);
     const [effect, setEffect] = React.useState(0);
 
+    const [connectedDevices, setConnectedDevices] = React.useState([]);
+    const [checked, setChecked] = React.useState([0]);
+
+    const handleToggle = (value) => () => {
+        const currentIndex = checked.indexOf(value);
+        const newChecked = [...checked];
+
+        if (currentIndex === -1) {
+            newChecked.push(value);
+        } else {
+            newChecked.splice(currentIndex, 1);
+        }
+
+        setChecked(newChecked);
+    };
+    if (connectedDevices.length === 0) {
+        fetch("http://nodemcu-controller:8081/getConnectedNodeMCUs")
+            .then(response => response.json())
+            .then(data => {
+                console.log(data)
+                setConnectedDevices(data)
+            })
+    }
+
+    console.log("device", connectedDevices)
     const buildConfig = () => {
         return {
             config: {
@@ -57,7 +80,12 @@ export default function App() {
                 useWhite: useWhite,
                 color: color,
                 effect: effect
-            }
+            },
+            nodes: connectedDevices
+                .filter((value, index) => checked.includes(index))
+                .map((value) => {
+                return {ID: value.ID}
+            })
         };
     }
 
@@ -66,7 +94,7 @@ export default function App() {
         const configString = JSON.stringify(config)
         console.log(configString)
 
-        fetch('/setConfig', {
+        fetch('http://nodemcu-controller:8081/setConfig', {
             method: 'POST', // *GET, POST, PUT, DELETE, etc.
             mode: 'cors', // no-cors, *cors, same-origin
             cache: 'no-cache', // *default, no-cache, reload, force-cache, only-if-cached
@@ -85,61 +113,49 @@ export default function App() {
 
     return (
         <Container>
+            <LEDConfig classes={classes}
+                       power={ledsOn}
+                       setPower={event => {
+                           setLedsOn(event.target.checked);
+                       }}
+                       useWhite={useWhite}
+                       setUseWhite={event => {
+                           setUseWhite(event.target.checked);
+                       }}
+                       selectedEffect={effect}
+                       onEffectChange={event => {
+                           setEffect(event.target.value)
+                       }}
+                       color={color}
+                       onColorChange={color => setColor(color.hex)}/>
+
             <Card className={classes.root}>
                 <CardContent>
                     <Typography className={classes.title} gutterBottom>
-                        Config
+                        Nodes
                     </Typography>
-                    <Typography className={classes.subtitle} gutterBottom>
-                        LEDs
-                    </Typography>
-                    <Button variant="contained" className={classes.button}
-                            onClick={() => setLedsOn(false)}>Off</Button>
-                    <Button variant="contained" className={classes.button} color="primary"
-                            onClick={() => setLedsOn(true)}> On </Button>
-                    <FormControlLabel
-                        control={
-                            <Checkbox
-                                checked={useWhite}
-                                onChange={(event => {
-                                    setUseWhite(event.target.checked);
-                                })}
-                                value="checkedB"
-                                color="primary"
-                            />
-                        }
-                        label="Use white LED"
-                    />
-                    <Typography className={classes.subtitle} gutterBottom>
-                        Effect
-                    </Typography>
-                    <FormControl variant="outlined" className={classes.formControl}>
-                        <InputLabel id="demo-simple-select-outlined-label">
-                            Effect
-                        </InputLabel>
-                        <Select
-                            id="demo-simple-select-outlined"
-                            value={effect}
-                            onChange={(event => {
-                                setEffect(event.target.value)
-                            })}
-                        >
-                            <MenuItem value={0}>Fill</MenuItem>
-                            <MenuItem value={1}>FadeInOut</MenuItem>
-                            <MenuItem value={2}>RainbowFade</MenuItem>
-                            <MenuItem value={3}>Rainbow</MenuItem>
-                            <MenuItem value={4}>RunningRainbow</MenuItem>
-                            <MenuItem value={5}>RunningColor</MenuItem>
-                        </Select>
-                    </FormControl>
-                    <Typography className={classes.subtitle} gutterBottom>
-                        Color
-                    </Typography>
-                    <HuePicker
-                        color={color}
-                        onChange={color => setColor(color.hex)}
-                        onChangeComplete={color => setColor(color.hex)}
-                    />
+                    <List className={classes.root}>
+                        {connectedDevices.map((value, index) => {
+                            const labelId = `checkbox-list-label-${index}`;
+
+                            return (
+                                <ListItem key={index} role={undefined} dense button onClick={handleToggle(index)}>
+                                    <ListItemIcon>
+                                        <Checkbox
+                                            edge="start"
+                                            checked={checked.indexOf(index) !== -1}
+                                            tabIndex={-1}
+                                            disableRipple
+                                            inputProps={{'aria-labelledby': labelId}}
+                                        />
+                                    </ListItemIcon>
+                                    <ListItemText id={labelId} primary={`ID ${value.ID}`}/>
+                                    <ListItemText id={labelId} primary={`IP ${value.IP}`}/>
+                                    <ListItemText id={labelId} primary={`LEDS ${value.LedCount}`}/>
+                                </ListItem>
+                            );
+                        })}
+                    </List>
                 </CardContent>
             </Card>
             <Button variant="contained" className={classes.button} onClick={onApply}>Apply</Button>

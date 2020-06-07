@@ -44,3 +44,4 @@ lfs.img
 *.x86_64
 *.hex
 
+raspberry/nodemcu-controller

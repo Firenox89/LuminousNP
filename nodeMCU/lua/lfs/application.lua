@@ -116,14 +116,32 @@ function setupWebServer()
     registerAtController()
 end
 
+local isConnectedToController = false
+local reconnectionDelay = 5000
+
 function registerAtController()
-    print("register at controller")
-    local socket = net.createConnection()
-    socket:on("connection", function(sck, c)
-        print("controller connected")
-        socket:send('{"id": 1, "ledCount": 188, "bytesPerLed": 4}')
-    end)
-    socket:connect(4488, "nodemcu-controller")
+    print("Try to register at controller")
+    if not isConnectedToController then
+        local socket = net.createConnection()
+        socket:on("connection", function(sck, c)
+            print("controller connected")
+            socket:send('{"id": 1, "ledCount": 188, "bytesPerLed": 4}')
+            isConnectedToController = true
+        end)
+        socket:on("disconnection", function(sck, c)
+            print("controller disconnected")
+            isConnectedToController = false
+            if not tmr.create():alarm(reconnectionDelay, tmr.ALARM_SINGLE, function()
+                registerAtController()
+            end)
+            then
+                print("Failed to start reconnection timer.")
+            end
+        end)
+        socket:connect(4488, "nodemcu-controller")
+    else
+        print("Already connected")
+    end
 end
 
 function printDump(o)
