@@ -20,7 +20,7 @@
 - The code to power the Touchscreen, to controll the setup without a browser
 
 
-### Steps to flash the nodeMCU (WPI)
+### Steps to flash the nodeMCU (WIP)
 ```
 esptool.py --port /dev/ttyUSB0 write_flash 0x00000 ../bin/0x00000.bin
 esptool.py --port /dev/ttyUSB0 write_flash 0x10000 ../bin/0x10000.bin

@@ -18,6 +18,7 @@ type ConnectedNodeMCU struct {
 	ID          int
 	LedCount    int
 	BytesPerLED int
+	Connection  net.Conn `json:"-"`
 }
 
 var connectedMCUs = make([]ConnectedNodeMCU, 0)
@@ -32,7 +33,7 @@ func main() {
 
 func generateEffectTestFile() {
 	effectData := generateColorSwitchEffect(250, 4, 188)
-	err := ioutil.WriteFile("test.effect", effectData, 0644)
+	err := ioutil.WriteFile("current.effect", effectData, 0644)
 	if err != nil {
 		// handle error
 	}
@@ -52,7 +53,7 @@ func generateEffectHeader(delay int16, bytesPerLed int16, ledCount int16) []byte
 func generateColorSwitchEffect(delay int16, bytesPerLed int16, ledCount int16) []byte {
 	var values = generateEffectHeader(delay, bytesPerLed, ledCount)
 
-	for j := 0; j < 100; j++ {
+	for j := 0; j < 10; j++ {
 		for i := 0; i < int(ledCount); i++ {
 			values = append(values, 255)
 			values = append(values, 0)
@@ -171,6 +172,11 @@ func sendNodeConfig(config SetConfigRequest) {
 				body.Add("color", config.Config.Color)
 				req, err = http.NewRequest("POST", "http://"+nodeToSendTo.IP+"/fill?level=0&color="+config.Config.Color, nil)
 				break
+			case 2:
+				effectData := generateColorSwitchEffect(250, int16(nodeToSendTo.BytesPerLED), int16(nodeToSendTo.LedCount))
+				sendEffectData(nodeToSendTo.Connection, effectData)
+				req, err = http.NewRequest("POST", "http://"+nodeToSendTo.IP+"/playEffect", nil)
+				break
 			}
 
 			if err != nil {
@@ -178,6 +184,23 @@ func sendNodeConfig(config SetConfigRequest) {
 			}
 		}
 		go sendRequest(err, req)
+	}
+}
+
+func sendEffectData(conn net.Conn, effectData []byte) {
+	log.Printf("Try to send effect file, size %d", len(effectData))
+
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.LittleEndian, int32(len(effectData)))
+	if err != nil {
+		log.Printf("Failed to write buffer", err)
+	}
+	log.Printf("buffer %d%d%d%d", buf.Bytes()[0],buf.Bytes()[1],buf.Bytes()[2],buf.Bytes()[3])
+	_, err = conn.Write(buf.Bytes())
+
+	_, err = conn.Write(effectData)
+	if err != nil {
+		log.Printf("Failed to send effect file", err)
 	}
 }
 
@@ -209,7 +232,7 @@ func startUDPServer() {
 			fmt.Printf("Some error  %v", err)
 			continue
 		} else {
-			parseRegistration(p, remoteaddr.IP.String())
+			parseRegistration(p, remoteaddr.IP.String(), nil)
 		}
 		go sendUDPTestResponse(ser, remoteaddr)
 	}
@@ -238,7 +261,7 @@ func startControllerService() {
 			log.Printf("Some error  %v", err)
 			continue
 		} else {
-			parseRegistration(p[:byteCount], ip)
+			parseRegistration(p[:byteCount], ip, conn)
 		}
 	}
 }
@@ -249,7 +272,7 @@ type NodeMCURegistrationRequest struct {
 	BytesPerLED int `json:"bytesPerLed"`
 }
 
-func parseRegistration(buffer []byte, ip string) {
+func parseRegistration(buffer []byte, ip string, conn *net.TCPConn) {
 	log.Printf("got '%s'", buffer)
 	request := NodeMCURegistrationRequest{}
 	err := json.Unmarshal(buffer, &request)
@@ -258,7 +281,7 @@ func parseRegistration(buffer []byte, ip string) {
 	} else {
 		log.Printf("NodeMCU registered %s %v", ip, request)
 
-		connectedMCUs = append(connectedMCUs, ConnectedNodeMCU{IP: ip, ID: request.ID, LedCount: request.LedCount, BytesPerLED: request.BytesPerLED})
+		connectedMCUs = append(connectedMCUs, ConnectedNodeMCU{IP: ip, ID: request.ID, LedCount: request.LedCount, BytesPerLED: request.BytesPerLED, Connection: conn})
 	}
 }
 

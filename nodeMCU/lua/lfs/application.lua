@@ -124,13 +124,16 @@ end
 local isConnectedToController = false
 local reconnectionDelay = 5000
 
+local initEffectFileDownload, saveEffectFile, finaliseEffectFile
+local n, effectSizeTotal, effectFileSize = 0, 0
+
 function registerAtController()
     print("Try to register at controller")
     if not isConnectedToController then
         local socket = net.createConnection()
         socket:on("connection", function(sck, c)
             print("controller connected")
-            socket:send('{"id": 2, "ledCount": 188, "bytesPerLed": 4}')
+            socket:send('{"id": 4, "ledCount": 188, "bytesPerLed": 4}')
             isConnectedToController = true
         end)
         socket:on("disconnection", function(sck, c)
@@ -143,9 +146,47 @@ function registerAtController()
                 print("Failed to start reconnection timer.")
             end
         end)
+        socket:on('receive', initEffectFileDownload)
         socket:connect(4488, "nodemcu-controller")
     else
         print("Already connected")
+    end
+end
+
+initEffectFileDownload = function(sck, rec)
+    effectFileSize = struct.unpack("<I4", rec)
+    print("got size " .. effectFileSize)
+    sck:on("receive", saveEffectFile)
+    file.open("current.effect", 'w')
+end
+
+saveEffectFile = function(sck, rec)
+    effectSizeTotal, n = effectSizeTotal + #rec, n + 1
+    if n % 4 == 1 then
+        sck:hold()
+        node.task.post(0, function()
+            sck:unhold()
+        end)
+    end
+    uart.write(0, ('%u of %u, '):format(effectSizeTotal, effectFileSize))
+    file.write(rec)
+    if effectSizeTotal == effectFileSize then
+        finaliseEffectFile(sck)
+    end
+end
+
+finaliseEffectFile = function(sck)
+    file.close()
+    sck:on("receive", nil)
+    sck:close()
+    n = 0
+    effectFileSize = 0
+    effectSizeTotal = 0
+    local s = file.stat("current.effect")
+    if (s and effectFileSize == s.size) then
+        print("Received new effect file")
+    else
+        print "Invalid save of effect file"
     end
 end
 
@@ -163,11 +204,9 @@ function playEffect()
         print("schema " .. schemaVersion .. " frameCounts " .. frameCount .. " deley per frame " .. delayPerFrame .. " bytesPerLed " .. bytesPerLed .. " led count " .. ledCount)
 
         for i = 1, frameCount do
-            print(string.format("Process Frame %d", i))
-
-            local frameValues = fd:read(bytesPerLed*ledCount)
+            local frameValues = fd:read(bytesPerLed * ledCount)
             for j = 1, ledCount do
-                local offset = ((j-1) * bytesPerLed)
+                local offset = ((j - 1) * bytesPerLed)
                 local r = string.byte(frameValues, offset + 1)
                 local g = string.byte(frameValues, offset + 2)
                 local b = string.byte(frameValues, offset + 3)
