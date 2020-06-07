@@ -198,6 +198,14 @@ function updateRGBW(index, g, r, b, w)
     ws2812.write(ledLevelBuffer[0])
 end
 
+function updateBuffer(index, g, r, b, w)
+    ledLevelBuffer[0]:set(index, g, r, b, w)
+end
+
+function writeBuffer()
+    ws2812.write(ledLevelBuffer[0])
+end
+
 function setEffect(effectCoroutine)
     if level == 0 then
         for i = 0, levelCount do
@@ -233,6 +241,8 @@ return {
     off = off,
     fill = fillRGB,
     updateRGBW = updateRGBW,
+    updateBuffer = updateBuffer,
+    writeBuffer = writeBuffer,
     setRainbow = setRainbow,
     setRainbowRoad = setRainbowRoad,
     setRainbowSnake = setRainbowSnake,

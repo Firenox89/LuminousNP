@@ -43,13 +43,13 @@ const useStyles = makeStyles(theme => ({
 export default function App() {
     const classes = useStyles();
 
-    const [color, setColor] = React.useState('#fff');
+    const [color, setColor] = React.useState('#ffffff');
     const [ledsOn, setLedsOn] = React.useState(true);
     const [useWhite, setUseWhite] = React.useState(true);
     const [effect, setEffect] = React.useState(0);
 
     const [connectedDevices, setConnectedDevices] = React.useState([]);
-    const [checked, setChecked] = React.useState([0]);
+    const [checked, setChecked] = React.useState([]);
 
     const handleToggle = (value) => () => {
         const currentIndex = checked.indexOf(value);
@@ -78,14 +78,14 @@ export default function App() {
             config: {
                 power: ledsOn,
                 useWhite: useWhite,
-                color: color,
+                color: color.substring(1),//cut the #
                 effect: effect
             },
             nodes: connectedDevices
                 .filter((value, index) => checked.includes(index))
                 .map((value) => {
-                return {ID: value.ID}
-            })
+                    return {ID: value.ID}
+                })
         };
     }
 

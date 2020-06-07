@@ -1,11 +1,15 @@
 package main
 
 import (
+	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -19,10 +23,70 @@ type ConnectedNodeMCU struct {
 var connectedMCUs = make([]ConnectedNodeMCU, 0)
 
 func main() {
+	generateEffectTestFile()
 	go serveWeb()
 
 	startControllerService()
 	//startUDPServer()
+}
+
+func generateEffectTestFile() {
+	effectData := generateColorSwitchEffect(250, 4, 188)
+	err := ioutil.WriteFile("test.effect", effectData, 0644)
+	if err != nil {
+		// handle error
+	}
+}
+
+func generateEffectHeader(delay int16, bytesPerLed int16, ledCount int16) []byte {
+	effect := EffectFormatHeader{1, delay, bytesPerLed, ledCount, 0}
+	buf := new(bytes.Buffer)
+	err := binary.Write(buf, binary.LittleEndian, effect)
+	if err != nil {
+		log.Println("binary.Write failed:", err)
+	}
+
+	return buf.Bytes()
+}
+
+func generateColorSwitchEffect(delay int16, bytesPerLed int16, ledCount int16) []byte {
+	var values = generateEffectHeader(delay, bytesPerLed, ledCount)
+
+	for j := 0; j < 100; j++ {
+		for i := 0; i < int(ledCount); i++ {
+			values = append(values, 255)
+			values = append(values, 0)
+			values = append(values, 0)
+			values = append(values, 0)
+		}
+		for i := 0; i < int(ledCount); i++ {
+			values = append(values, 0)
+			values = append(values, 255)
+			values = append(values, 0)
+			values = append(values, 0)
+		}
+		for i := 0; i < int(ledCount); i++ {
+			values = append(values, 0)
+			values = append(values, 0)
+			values = append(values, 255)
+			values = append(values, 0)
+		}
+		for i := 0; i < int(ledCount); i++ {
+			values = append(values, 0)
+			values = append(values, 0)
+			values = append(values, 0)
+			values = append(values, 255)
+		}
+	}
+	return values
+}
+
+type EffectFormatHeader struct {
+	SchemaVersion int16
+	DelayPerFrame int16
+	BytesPerLED   int16
+	LedCount      int16
+	Flags         int32
 }
 
 type SetConfigRequest struct {
@@ -97,19 +161,33 @@ func sendNodeConfig(config SetConfigRequest) {
 				log.Printf("Failed to create request", err)
 			}
 		} else {
-			req, err = http.NewRequest("POST", "http://"+nodeToSendTo.IP+"/on", nil)
+			switch config.Config.Effect {
+			case 0:
+				req, err = http.NewRequest("POST", "http://"+nodeToSendTo.IP+"/on", nil)
+				break
+			case 1:
+				body := url.Values{}
+				body.Add("level", "0")
+				body.Add("color", config.Config.Color)
+				req, err = http.NewRequest("POST", "http://"+nodeToSendTo.IP+"/fill?level=0&color="+config.Config.Color, nil)
+				break
+			}
 
 			if err != nil {
 				log.Printf("Failed to create request", err)
 			}
 		}
-		client := &http.Client{}
-		resp, err := client.Do(req)
-		if err != nil {
-			panic(err)
-		}
-		resp.Body.Close()
+		go sendRequest(err, req)
 	}
+}
+
+func sendRequest(err error, req *http.Request) {
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Printf("Request failed %v", req, err)
+	}
+	resp.Body.Close()
 }
 
 func startUDPServer() {

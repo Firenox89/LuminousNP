@@ -8,7 +8,7 @@ import FormControl from "@material-ui/core/FormControl";
 import InputLabel from "@material-ui/core/InputLabel";
 import Select from "@material-ui/core/Select";
 import MenuItem from "@material-ui/core/MenuItem";
-import {HuePicker} from "react-color";
+import {HuePicker, SliderPicker} from "react-color";
 import * as PropTypes from "prop-types";
 import React from "react";
 
@@ -72,6 +72,13 @@ export function LEDConfig(props) {
                 onChange={props.onColorChange}
                 onChangeComplete={props.onChange}
             />
+            <div style={{margin: 16}}>
+                <SliderPicker
+                    color={props.color}
+                    onChange={props.onColorChange}
+                    onChangeComplete={props.onChange}
+                />
+            </div>
         </CardContent>
     </Card>;
 }

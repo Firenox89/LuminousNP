@@ -63,6 +63,11 @@ function setupWebServer()
         res:send(200)
     end)
 
+    httpServer:use('/playEffect', function(req, res)
+        playEffect()
+        res:send(200)
+    end)
+
     httpServer:use('/effects', function(req, res)
         effectJson = "[\"Rainbow\", \"Rainbow Road\", \"Rainbow Snake\", \"Running Light\", \"Pulsing Light\"]"
         res:send(effectJson)
@@ -125,7 +130,7 @@ function registerAtController()
         local socket = net.createConnection()
         socket:on("connection", function(sck, c)
             print("controller connected")
-            socket:send('{"id": 1, "ledCount": 188, "bytesPerLed": 4}')
+            socket:send('{"id": 2, "ledCount": 188, "bytesPerLed": 4}')
             isConnectedToController = true
         end)
         socket:on("disconnection", function(sck, c)
@@ -141,6 +146,40 @@ function registerAtController()
         socket:connect(4488, "nodemcu-controller")
     else
         print("Already connected")
+    end
+end
+
+function playEffect()
+    -- print the first 5 bytes of 'init.lua'
+    local fd = file.open("current.effect", "r")
+    if fd then
+        local size = file.stat("current.effect").size
+        local header = fd:read(12)
+        --https://nodemcu.readthedocs.io/en/master/modules/struct/#structunpack
+        local schemaVersion, delayPerFrame, bytesPerLed, ledCount = struct.unpack("<hhhhI4", header)
+
+        local frameCount = (size - 12) / (bytesPerLed * ledCount)
+
+        print("schema " .. schemaVersion .. " frameCounts " .. frameCount .. " deley per frame " .. delayPerFrame .. " bytesPerLed " .. bytesPerLed .. " led count " .. ledCount)
+
+        for i = 1, frameCount do
+            print(string.format("Process Frame %d", i))
+
+            local frameValues = fd:read(bytesPerLed*ledCount)
+            for j = 1, ledCount do
+                local offset = ((j-1) * bytesPerLed)
+                local r = string.byte(frameValues, offset + 1)
+                local g = string.byte(frameValues, offset + 2)
+                local b = string.byte(frameValues, offset + 3)
+                local w = string.byte(frameValues, offset + 4)
+
+                LEDs.updateBuffer(j, g, r, b, w)
+            end
+            LEDs.writeBuffer()
+        end
+
+        fd:close();
+        fd = nil
     end
 end
 
@@ -187,7 +226,7 @@ function openUDPSocket()
                 end
             end
         end)
-        udpSocket:send(1234, ip, "{id: 1, ledCount: 188, bytesPerLed: 4}")
+        udpSocket:send(1234, ip, "{id: 3, ledCount: 188, bytesPerLed: 4}")
     end)
 end
 
