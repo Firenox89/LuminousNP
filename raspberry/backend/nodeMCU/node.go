@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"time"
 )
 
 type ConnectedNode struct {
@@ -14,7 +15,59 @@ type ConnectedNode struct {
 	ID          string
 	LedCount    int
 	BytesPerLED int
+	isConnected bool
 	Connection  net.Conn `json:"-"`
+}
+
+func NewConnectionNode(
+	IP string,
+	ID string,
+	LedCount int,
+	BytesPerLED int,
+	Connection net.Conn) *ConnectedNode {
+	node := &ConnectedNode{
+		IP:          IP,
+		ID:          ID,
+		LedCount:    LedCount,
+		BytesPerLED: BytesPerLED,
+		isConnected: true,
+		Connection:  Connection,
+	}
+	node.startHeartbeat()
+	return node
+}
+
+func (n *ConnectedNode) startHeartbeat() {
+	ticker := time.NewTicker(5 * time.Second)
+	done := make(chan bool)
+
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				log.Printf("ping " + n.ID)
+				_, err := n.Connection.Write([]byte("Ping"))
+				if err != nil {
+					log.Printf("ping failed for " + n.ID)
+					done <- true
+					ticker.Stop()
+					n.isConnected = false
+				}
+				buffer := make([]byte, 512)
+				err = n.Connection.SetReadDeadline(time.Now().Add(1 * time.Second))
+				_, err = n.Connection.Read(buffer)
+				log.Printf("pong %s %s", n.ID, buffer)
+				if err != nil {
+					log.Printf("ping failed for " + n.ID)
+					done <- true
+					ticker.Stop()
+					n.isConnected = false
+				}
+			}
+		}
+	}()
 }
 
 func (n *ConnectedNode) SendEffectData(effectData []byte) {

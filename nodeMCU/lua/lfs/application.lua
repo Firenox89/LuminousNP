@@ -148,16 +148,13 @@ end
 local isConnectedToController = false
 local reconnectionDelay = 5000
 
-local initEffectFileDownload, saveEffectFile, finaliseEffectFile
-local n, effectSizeTotal, effectFileSize = 0, 0
-
 function registerAtController()
     print("Try to register at controller")
     if not isConnectedToController then
         local socket = net.createConnection()
         socket:on("connection", function(sck, c)
             print("controller connected")
-            socket:send('{"id": "Vitrine 1", "ledCount": 188, "bytesPerLed": 4}')
+            socket:send('{"id": "Testboard", "ledCount": 188, "bytesPerLed": 4}')
             isConnectedToController = true
         end)
         socket:on("disconnection", function(sck, c)
@@ -171,7 +168,7 @@ function registerAtController()
             end
         end)
         socket:on('receive', function(sck, c)
-
+            socket:send('Pong')
         end)
         socket:connect(4488, "nodemcu-controller")
     else
