@@ -11,9 +11,27 @@ func main() {
 	nodeMCUController := nodeMCU.NewController()
 	go nodeMCUController.StartControllerService()
 
-	web.ServeWeb(&nodeMCUController.ConnectedMCUs, func(request web.SetConfigRequest) {
-		SendNodeConfig(request, nodeMCUController)
-	})
+	web.ServeWeb(&nodeMCUController.ConnectedMCUs,
+		func(request web.SetConfigRequest) {
+			SendNodeConfig(request, nodeMCUController)
+		},
+		func(effectId int, bytesPerLED int, ledCount int) []byte {
+			switch effectId {
+			case 0:
+				log.Printf("effect request id is not an effect")
+				break
+			case 1:
+				log.Printf("effect request id is not an effect")
+				break
+			case 2:
+				return utils.GenerateColorSwitchEffect(int16(bytesPerLED), int16(ledCount))
+			case 3:
+				return utils.GenerateRainbowFade(int16(bytesPerLED), int16(ledCount))
+			case 4:
+				return utils.GenerateRunningRainbow(int16(bytesPerLED), int16(ledCount))
+			}
+			return nil
+		})
 
 	//startUDPServer()
 }
@@ -48,17 +66,8 @@ func sendConfig(request web.SetConfigRequest, node *nodeMCU.ConnectedNode) {
 		case 1:
 			err = node.ColorFill(request.Config.Color)
 			break
-		case 2:
-			effectData := utils.GenerateColorSwitchEffect(int16(node.BytesPerLED), int16(node.LedCount))
-			node.SendEffectData(effectData)
-			break
-		case 3:
-			effectData := utils.GenerateRainbowFade(int16(node.BytesPerLED), int16(node.LedCount))
-			node.SendEffectData(effectData)
-			break
-		case 4:
-			effectData := utils.GenerateRunningRainbow(int16(node.BytesPerLED), int16(node.LedCount))
-			node.SendEffectData(effectData)
+		default:
+			err = node.StartEffect(request.Config.Effect)
 			break
 		}
 	}

@@ -118,6 +118,30 @@ function setupWebServer()
         openUDPSocket()
     end)
 
+    httpServer:use('/restart', function(req, res)
+        node.restart()
+    end)
+
+    httpServer:use('/startEffect', function(req, res)
+        print("Start effect")
+        local effectID = req.query.id
+        local bytesPerLed = 4
+        local ledcount = 188
+
+        stopEffect()
+        LFS.HTTP_Download(
+                "nodemcu-controller",
+                "/",
+                "effectFile",
+                "?effect=" .. effectID .. "&byteperled=" .. bytesPerLed .. "&ledcount=" .. ledcount,
+                "current.effect",
+                function()
+                    print("effect file download complete")
+                    playEffect()
+                end)
+        res:send(200)
+    end)
+
     registerAtController()
 end
 
@@ -133,7 +157,7 @@ function registerAtController()
         local socket = net.createConnection()
         socket:on("connection", function(sck, c)
             print("controller connected")
-            socket:send('{"id": "Testboard", "ledCount": 188, "bytesPerLed": 4}')
+            socket:send('{"id": "Vitrine 1", "ledCount": 188, "bytesPerLed": 4}')
             isConnectedToController = true
         end)
         socket:on("disconnection", function(sck, c)
@@ -146,55 +170,13 @@ function registerAtController()
                 print("Failed to start reconnection timer.")
             end
         end)
-        socket:on('receive', initEffectFileDownload)
+        socket:on('receive', function(sck, c)
+
+        end)
         socket:connect(4488, "nodemcu-controller")
     else
         print("Already connected")
     end
-end
-
-initEffectFileDownload = function(sck, rec)
-    stopEffect()
-    effectFileSize = struct.unpack("<I4", rec)
-    print("got size " .. effectFileSize)
-    sck:on("receive", saveEffectFile)
-    file.open("current.effect", 'w')
-end
-
-saveEffectFile = function(sck, rec)
-    effectSizeTotal, n = effectSizeTotal + #rec, n + 1
-    if n % 4 == 1 then
-        sck:hold()
-        node.task.post(0, function()
-            sck:unhold()
-        end)
-    end
-    file.write(rec)
-    if effectSizeTotal == effectFileSize then
-        finaliseEffectFile(sck)
-    end
-end
-
-finaliseEffectFile = function(sck)
-    file.close()
-    sck:on("receive", nil)
-    sck:close()
-    n = 0
-    effectSizeTotal = 0
-    local s = file.stat("current.effect")
-    if (s and effectFileSize == s.size) then
-        print("Received new effect file")
-        playEffect()
-        effectFileSize = 0
-    else
-        if (s) then
-            print("Effect file size mismatch " .. s.size .. "/" .. effectFileSize)
-        else
-            print "No effect file saved"
-        end
-    end
-    isConnectedToController = false
-    registerAtController()
 end
 
 function printDump(o)
@@ -247,7 +229,15 @@ end
 if file.exists("OTA.update") then
     print("OTA file exists")
     file.remove("OTA.update")
-    LFS.HTTP_OTA("nodemcu-controller", "/", "lfs.img")
+    LFS.HTTP_Download("nodemcu-controller", "/", "lfs.img", "", "lfs.img", function()
+        wifi.setmode(wifi.NULLMODE, false)
+        collectgarbage();
+        collectgarbage()
+        -- run as separate task to maximise RAM available
+        node.task.post(function()
+            node.flashreload("lfs.img")
+        end)
+    end)
 else
     LEDs.init()
     setupWebServer()

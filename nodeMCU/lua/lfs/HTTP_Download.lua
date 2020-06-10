@@ -1,11 +1,4 @@
---
--- If you have the LFS _init loaded then you invoke the provision by
--- executing LFS.HTTP_OTA('your server','directory','image name').  Note
--- that is unencrypted and unsigned. But the loader does validate that
--- the image file is a valid and complete LFS image before loading.
---
-
-local host, dir, image = ...
+local host, dir, fileuri, query, localfile, callback = ...
 
 local doRequest, firstRec, subsRec, finalise
 local n, total, size = 0, 0
@@ -17,7 +10,7 @@ doRequest = function(socket, hostIP) -- luacheck: no unused
         con:on("connection",function(sck)
             print("on connect")
             local request = table.concat( {
-                    "GET "..dir..image.." HTTP/1.1",
+                    "GET "..dir..fileuri..query.." HTTP/1.1",
                     "User-Agent: ESP8266 app (linux-gnu)",
                     "Accept: application/octet-stream",
                     "Accept-Encoding: identity",
@@ -41,7 +34,7 @@ firstRec = function (sck,rec)
     print(rec:sub(1, i+1))
     if size > 0 then
         sck:on("receive",subsRec)
-        file.open(image, 'w')
+        file.open(localfile, 'w')
         subsRec(sck, rec:sub(i+4))
     else
         sck:on("receive", nil)
@@ -65,12 +58,10 @@ finalise = function(sck)
     file.close()
     sck:on("receive", nil)
     sck:close()
-    local s = file.stat(image)
+    print("Download finished")
+    local s = file.stat(localfile)
     if (s and size == s.size) then
-        wifi.setmode(wifi.NULLMODE, false)
-        collectgarbage();collectgarbage()
-        -- run as separate task to maximise RAM available
-        node.task.post(function() node.flashreload(image) end)
+        callback()
     else
         print"Invalid save of image file"
     end

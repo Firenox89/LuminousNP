@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"strconv"
 )
 
 type ConnectedNode struct {
@@ -24,13 +25,20 @@ func (n *ConnectedNode) SendEffectData(effectData []byte) {
 	if err != nil {
 		log.Printf("Failed to write buffer", err)
 	}
-	log.Printf("buffer %d%d%d%d", buf.Bytes()[0], buf.Bytes()[1], buf.Bytes()[2], buf.Bytes()[3])
 	_, err = n.Connection.Write(buf.Bytes())
 
 	_, err = n.Connection.Write(effectData)
 	if err != nil {
 		log.Printf("Failed to send effect file", err)
 	}
+}
+
+func (n *ConnectedNode) StartEffect(effectId int) error {
+	req, err := http.NewRequest("POST", "http://"+n.IP+"/startEffect?id="+strconv.Itoa(effectId), nil)
+	if err == nil {
+		return sendRequest(req)
+	}
+	return err
 }
 
 func (n *ConnectedNode) PowerOff() error {
@@ -61,7 +69,10 @@ func sendRequest(req *http.Request) error {
 	log.Printf("Send request %s", req.URL)
 	client := &http.Client{}
 	resp, err := client.Do(req)
-	defer resp.Body.Close()
+
+	if resp != nil {
+		log.Printf("Request status code " + resp.Status)
+	}
 
 	return err
 }
