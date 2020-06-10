@@ -133,7 +133,7 @@ function registerAtController()
         local socket = net.createConnection()
         socket:on("connection", function(sck, c)
             print("controller connected")
-            socket:send('{"id": 4, "ledCount": 188, "bytesPerLed": 4}')
+            socket:send('{"id": "Testboard", "ledCount": 188, "bytesPerLed": 4}')
             isConnectedToController = true
         end)
         socket:on("disconnection", function(sck, c)
@@ -154,6 +154,7 @@ function registerAtController()
 end
 
 initEffectFileDownload = function(sck, rec)
+    stopEffect()
     effectFileSize = struct.unpack("<I4", rec)
     print("got size " .. effectFileSize)
     sck:on("receive", saveEffectFile)
@@ -168,7 +169,6 @@ saveEffectFile = function(sck, rec)
             sck:unhold()
         end)
     end
-    uart.write(0, ('%u of %u, '):format(effectSizeTotal, effectFileSize))
     file.write(rec)
     if effectSizeTotal == effectFileSize then
         finaliseEffectFile(sck)
@@ -180,46 +180,21 @@ finaliseEffectFile = function(sck)
     sck:on("receive", nil)
     sck:close()
     n = 0
-    effectFileSize = 0
     effectSizeTotal = 0
     local s = file.stat("current.effect")
     if (s and effectFileSize == s.size) then
         print("Received new effect file")
+        playEffect()
+        effectFileSize = 0
     else
-        print "Invalid save of effect file"
-    end
-end
-
-function playEffect()
-    -- print the first 5 bytes of 'init.lua'
-    local fd = file.open("current.effect", "r")
-    if fd then
-        local size = file.stat("current.effect").size
-        local header = fd:read(12)
-        --https://nodemcu.readthedocs.io/en/master/modules/struct/#structunpack
-        local schemaVersion, delayPerFrame, bytesPerLed, ledCount = struct.unpack("<hhhhI4", header)
-
-        local frameCount = (size - 12) / (bytesPerLed * ledCount)
-
-        print("schema " .. schemaVersion .. " frameCounts " .. frameCount .. " deley per frame " .. delayPerFrame .. " bytesPerLed " .. bytesPerLed .. " led count " .. ledCount)
-
-        for i = 1, frameCount do
-            local frameValues = fd:read(bytesPerLed * ledCount)
-            for j = 1, ledCount do
-                local offset = ((j - 1) * bytesPerLed)
-                local r = string.byte(frameValues, offset + 1)
-                local g = string.byte(frameValues, offset + 2)
-                local b = string.byte(frameValues, offset + 3)
-                local w = string.byte(frameValues, offset + 4)
-
-                LEDs.updateBuffer(j, g, r, b, w)
-            end
-            LEDs.writeBuffer()
+        if (s) then
+            print("Effect file size mismatch " .. s.size .. "/" .. effectFileSize)
+        else
+            print "No effect file saved"
         end
-
-        fd:close();
-        fd = nil
     end
+    isConnectedToController = false
+    registerAtController()
 end
 
 function printDump(o)
@@ -272,7 +247,7 @@ end
 if file.exists("OTA.update") then
     print("OTA file exists")
     file.remove("OTA.update")
-    LFS.HTTP_OTA("sirmixalot", "/", "lfs.img")
+    LFS.HTTP_OTA("nodemcu-controller", "/", "lfs.img")
 else
     LEDs.init()
     setupWebServer()

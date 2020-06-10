@@ -45,4 +45,5 @@ lfs.img
 *.hex
 *.effect
 
-raspberry/nodemcu-controller
+raspberry/backend/nodemcu-controller
+raspberry/build

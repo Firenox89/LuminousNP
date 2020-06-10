@@ -43,7 +43,7 @@ const useStyles = makeStyles(theme => ({
 export default function App() {
     const classes = useStyles();
 
-    const [color, setColor] = React.useState('#ffffff');
+    const [color, setColor] = React.useState('#ff0000');
     const [ledsOn, setLedsOn] = React.useState(true);
     const [useWhite, setUseWhite] = React.useState(true);
     const [effect, setEffect] = React.useState(0);
@@ -64,7 +64,7 @@ export default function App() {
         setChecked(newChecked);
     };
     if (connectedDevices.length === 0) {
-        fetch("http://nodemcu-controller:8081/getConnectedNodeMCUs")
+        fetch("/getConnectedNodeMCUs")
             .then(response => response.json())
             .then(data => {
                 console.log(data)
@@ -94,7 +94,7 @@ export default function App() {
         const configString = JSON.stringify(config)
         console.log(configString)
 
-        fetch('http://nodemcu-controller:8081/setConfig', {
+        fetch('/setConfig', {
             method: 'POST', // *GET, POST, PUT, DELETE, etc.
             mode: 'cors', // no-cors, *cors, same-origin
             cache: 'no-cache', // *default, no-cache, reload, force-cache, only-if-cached
@@ -149,9 +149,9 @@ export default function App() {
                                             inputProps={{'aria-labelledby': labelId}}
                                         />
                                     </ListItemIcon>
-                                    <ListItemText id={labelId} primary={`ID ${value.ID}`}/>
-                                    <ListItemText id={labelId} primary={`IP ${value.IP}`}/>
-                                    <ListItemText id={labelId} primary={`LEDS ${value.LedCount}`}/>
+                                    <ListItemText id={labelId} primary={`${value.ID}`}/>
+                                    <ListItemText id={labelId} primary={`IP: ${value.IP}`}/>
+                                    <ListItemText id={labelId} primary={`LEDS: ${value.LedCount}`}/>
                                 </ListItem>
                             );
                         })}

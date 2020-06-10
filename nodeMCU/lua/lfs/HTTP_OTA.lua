@@ -29,7 +29,7 @@ doRequest = function(socket, hostIP) -- luacheck: no unused
             sck:on("receive",firstRec)
         end)
         print("connect")
-        con:connect(8000,hostIP)
+        con:connect(80,hostIP)
     end
 end
 
