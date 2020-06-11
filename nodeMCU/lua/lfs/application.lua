@@ -12,10 +12,6 @@ function setupWebServer()
         res:send('Fetching')
     end)
 
-    httpServer:use('/test', function(req, res)
-        res:send('Test')
-    end)
-
     httpServer:use('/debugStrings', function(req, res)
         do
             local a = debug.getstrings 'RAM'
@@ -142,7 +138,63 @@ function setupWebServer()
         res:send(200)
     end)
 
+    httpServer:use('/updateConfig', function(req, res)
+        local id = req.query.id
+        local bytesPerLed = req.query.bytesperled
+        local ledcount = req.query.ledcount
+        local segments = req.query.segments
+
+        saveConfig(id, bytesPerLed, ledcount, segments)
+        loadConfig()
+    end)
+
     registerAtController()
+end
+
+local nodeID, bytesPerLed, ledCount, segments, segmentList
+
+function loadConfig()
+    if file.exists("node.config") then
+        local fd = file.open("node.config", "r")
+        nodeID = fd:readline():gsub("%s+", "")
+        bytesPerLed = fd:readline():gsub("%s+", "")
+        ledCount = fd:readline():gsub("%s+", "")
+        segments = fd:readline():gsub("%s+", "")
+        segmentList = splitString(segments, ",")
+        fd:close()
+        print("Config loaded")
+        print("ID " .. nodeID)
+        print("Bytes per LED " .. bytesPerLed)
+        print("LED Count " .. ledCount)
+        print("segments " .. segments)
+    else
+        print("No config files found")
+        nodeID = "No ID set"
+        bytesPerLed = 4
+        ledCount = 0
+        segments = ""
+        segmentList = ""
+    end
+end
+
+function saveConfig(id, bytesPerLed, ledcount, segments)
+    local fd = file.open("node.config", "w")
+    fd:writeline(id)
+    fd:writeline(bytesPerLed)
+    fd:writeline(ledcount)
+    fd:writeline(segments)
+    fd:close()
+end
+
+function splitString (inputstr, sep)
+    if sep == nil then
+        sep = "%s"
+    end
+    local t = {}
+    for str in string.gmatch(inputstr, "([^" .. sep .. "]+)") do
+        table.insert(t, str)
+    end
+    return t
 end
 
 local isConnectedToController = false
@@ -154,7 +206,7 @@ function registerAtController()
         local socket = net.createConnection()
         socket:on("connection", function(sck, c)
             print("controller connected")
-            socket:send('{"id": "Testboard", "ledCount": 188, "bytesPerLed": 4}')
+            socket:send('{"id": "' .. nodeID .. '", "ledCount": ' .. ledCount .. ', "bytesPerLed": ' .. bytesPerLed .. ', "segments":[' .. segments .. ']}')
             isConnectedToController = true
         end)
         socket:on("disconnection", function(sck, c)
@@ -237,6 +289,7 @@ if file.exists("OTA.update") then
     end)
 else
     LEDs.init()
+    loadConfig()
     setupWebServer()
 end
 

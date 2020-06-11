@@ -19,9 +19,6 @@ type EffectFormatHeader struct {
 var (
 	repeatFlag        int32 = 1 << 0
 	shiftCircularFlag int32 = 1 << 1
-	testFlag1         int32 = 1 << 2
-	testFlag2         int32 = 1 << 3
-	testFlag3         int32 = 1 << 4
 )
 
 func generateEffectHeader(delay int16, bytesPerLed int16, ledCount int16, repeat bool, shiftCircular bool) []byte {
@@ -43,7 +40,7 @@ func generateEffectHeader(delay int16, bytesPerLed int16, ledCount int16, repeat
 	return buf.Bytes()
 }
 
-func GenerateColorSwitchEffect(bytesPerLed int16, ledCount int16) []byte {
+func GenerateColorFadeEffect(bytesPerLed int16, ledCount int16) []byte {
 	var values = generateEffectHeader(defaultDelay, bytesPerLed, ledCount, true, false)
 
 	for j := 0; j < 10; j++ {
@@ -52,24 +49,6 @@ func GenerateColorSwitchEffect(bytesPerLed int16, ledCount int16) []byte {
 			values = append(values, 0)
 			values = append(values, 0)
 			values = append(values, 0)
-		}
-		for i := 0; i < int(ledCount); i++ {
-			values = append(values, 0)
-			values = append(values, 255)
-			values = append(values, 0)
-			values = append(values, 0)
-		}
-		for i := 0; i < int(ledCount); i++ {
-			values = append(values, 0)
-			values = append(values, 0)
-			values = append(values, 255)
-			values = append(values, 0)
-		}
-		for i := 0; i < int(ledCount); i++ {
-			values = append(values, 0)
-			values = append(values, 0)
-			values = append(values, 0)
-			values = append(values, 255)
 		}
 	}
 	return values

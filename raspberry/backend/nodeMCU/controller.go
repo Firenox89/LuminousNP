@@ -12,6 +12,7 @@ type RegistrationRequest struct {
 	ID          string `json:"id"`
 	LedCount    int    `json:"ledCount"`
 	BytesPerLED int    `json:"bytesPerLed"`
+	Segments    []int  `json:"segments"`
 }
 
 type Controller struct {
@@ -55,7 +56,7 @@ func (c *Controller) parseRegistration(buffer []byte, ip string, conn *net.TCPCo
 	request := RegistrationRequest{}
 	err := json.Unmarshal(buffer, &request)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("error on parsing '%s', err %v", buffer, err)
 	} else {
 		log.Printf("NodeMCU registered %s %v", ip, request)
 
