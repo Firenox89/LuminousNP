@@ -67,11 +67,11 @@ export function LEDConfig(props) {
             <Typography className={props.classes.subtitle} gutterBottom>
                 Color
             </Typography>
-            <HuePicker
-                color={props.color}
-                onChange={props.onColorChange}
-                onChangeComplete={props.onChange}
-            />
+            {/*<HuePicker*/}
+            {/*    color={props.color}*/}
+            {/*    onChange={props.onColorChange}*/}
+            {/*    onChangeComplete={props.onChange}*/}
+            {/*/>*/}
             <div style={{margin: 16}}>
                 <SliderPicker
                     color={props.color}

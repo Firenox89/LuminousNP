@@ -24,7 +24,7 @@ func main() {
 				log.Printf("effect request id is not an effect")
 				break
 			case 2:
-				return utils.GenerateColorFadeEffect(int16(bytesPerLED), int16(ledCount), )
+				return utils.GenerateColorFadeEffect(int16(bytesPerLED), int16(ledCount))
 			case 3:
 				return utils.GenerateRainbowFade(int16(bytesPerLED), int16(ledCount))
 			case 4:

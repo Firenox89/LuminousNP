@@ -15,7 +15,7 @@ type ConnectedNode struct {
 	ID          string
 	LedCount    int
 	BytesPerLED int
-	isConnected bool
+	IsConnected *bool
 	Connection  net.Conn `json:"-"`
 }
 
@@ -30,9 +30,10 @@ func NewConnectionNode(
 		ID:          ID,
 		LedCount:    LedCount,
 		BytesPerLED: BytesPerLED,
-		isConnected: true,
+		IsConnected: new(bool),
 		Connection:  Connection,
 	}
+	*node.IsConnected = true
 	node.startHeartbeat()
 	return node
 }
@@ -50,18 +51,18 @@ func (n *ConnectedNode) startHeartbeat() {
 				_, err := n.Connection.Write([]byte("Ping"))
 				if err != nil {
 					log.Printf("ping failed for " + n.ID)
+					*n.IsConnected = false
 					done <- true
 					ticker.Stop()
-					n.isConnected = false
 				}
 				buffer := make([]byte, 64)
 				err = n.Connection.SetReadDeadline(time.Now().Add(1 * time.Second))
 				_, err = n.Connection.Read(buffer)
 				if err != nil {
 					log.Printf("ping failed for " + n.ID)
+					*n.IsConnected = false
 					done <- true
 					ticker.Stop()
-					n.isConnected = false
 				}
 			}
 		}
