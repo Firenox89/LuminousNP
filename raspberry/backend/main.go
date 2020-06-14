@@ -7,36 +7,24 @@ import (
 	"utils/web"
 )
 
+var effectStore = make(map[string][]byte)
+
 func main() {
 	nodeMCUController := nodeMCU.NewController()
 	go nodeMCUController.StartControllerService()
 
 	web.ServeWeb(&nodeMCUController.ConnectedMCUs,
 		func(request web.SetConfigRequest) {
-			SendNodeConfig(request, nodeMCUController)
+			processNodesConfig(request, nodeMCUController)
 		},
-		func(effectId int, bytesPerLED int, ledCount int) []byte {
-			switch effectId {
-			case 0:
-				log.Printf("effect request id is not an effect")
-				break
-			case 1:
-				log.Printf("effect request id is not an effect")
-				break
-			case 2:
-				return utils.GenerateColorFadeEffect(int16(bytesPerLED), int16(ledCount))
-			case 3:
-				return utils.GenerateRainbowFade(int16(bytesPerLED), int16(ledCount))
-			case 4:
-				return utils.GenerateRunningRainbow(int16(bytesPerLED), int16(ledCount))
-			}
-			return nil
+		func(effectId string) []byte {
+			return effectStore[effectId]
 		})
 
 	//startUDPServer()
 }
 
-func SendNodeConfig(request web.SetConfigRequest, controller *nodeMCU.Controller) {
+func processNodesConfig(request web.SetConfigRequest, controller *nodeMCU.Controller) {
 	log.Printf("Process config request...")
 	var nodes []*nodeMCU.ConnectedNode
 	for _, requestedNode := range request.Nodes {
@@ -66,8 +54,21 @@ func sendConfig(request web.SetConfigRequest, node *nodeMCU.ConnectedNode) {
 		case 1:
 			err = node.ColorFill(request.Config.Color)
 			break
-		default:
-			err = node.StartEffect(request.Config.Effect)
+		case 2:
+			effectData, err := utils.GenerateColorFadeEffect(node.BytesPerLED, node.LedCount, request.Config.Color)
+			if err == nil {
+				effectStore[node.ID] = effectData
+
+				err = node.StartEffect()
+			}
+			break
+		case 3:
+			effectStore[node.ID] = utils.GenerateRainbowFade(node.BytesPerLED, node.LedCount)
+			err = node.StartEffect()
+			break
+		case 4:
+			effectStore[node.ID] = utils.GenerateRunningRainbow(node.BytesPerLED, node.LedCount)
+			err = node.StartEffect()
 			break
 		}
 	}

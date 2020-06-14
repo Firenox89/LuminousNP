@@ -1,5 +1,9 @@
 LEDs = require 'LED_control'
 
+local nodeID, bytesPerLed, ledCount, segments, segmentList
+local isConnectedToController = false
+local reconnectionDelay = 5000
+
 function setupWebServer()
     print("setup webserver")
     dofile('httpServer.lua')
@@ -60,38 +64,8 @@ function setupWebServer()
     end)
 
     httpServer:use('/playEffect', function(req, res)
+        stopEffect()
         playEffect()
-        res:send(200)
-    end)
-
-    httpServer:use('/effects', function(req, res)
-        effectJson = "[\"Rainbow\", \"Rainbow Road\", \"Rainbow Snake\", \"Running Light\", \"Pulsing Light\"]"
-        res:send(effectJson)
-    end)
-
-    httpServer:use('/effect', function(req, res)
-        level = tonumber(req.query.level)
-        effect = req.query.effect
-        rawColor = req.query.color
-        r = tonumber(rawColor:sub(1, 2), 16)
-        g = tonumber(rawColor:sub(3, 4), 16)
-        b = tonumber(rawColor:sub(5, 6), 16)
-        hue, sat, bri = color_utils.grb2hsv(g, r, b)
-        if level == nil then
-            level = 0
-        end
-        print("set " .. effect or "no effect" .. " for " .. level)
-        if effect == "Rainbow" then
-            LEDs.setRainbow(level)
-        elseif effect == "Rainbow Road" then
-            LEDs.setRainbowRoad(level)
-        elseif effect == "Rainbow Snake" then
-            LEDs.setRainbowSnake(level)
-        elseif effect == "Running Light" then
-            LEDs.setRunningLight(level, hue)
-        elseif effect == "Pulsing Light" then
-            LEDs.setPulsingLight(level, hue)
-        end
         res:send(200)
     end)
 
@@ -107,16 +81,13 @@ function setupWebServer()
 
     httpServer:use('/startEffect', function(req, res)
         print("Start effect")
-        local effectID = req.query.id
-        local bytesPerLed = 4
-        local ledcount = 188
 
         stopEffect()
         LFS.HTTP_Download(
                 "nodemcu-controller",
                 "/",
                 "effectFile",
-                "?effect=" .. effectID .. "&byteperled=" .. bytesPerLed .. "&ledcount=" .. ledcount,
+                "?id=" .. nodeID,
                 "current.effect",
                 function()
                     print("effect file download complete")
@@ -138,8 +109,6 @@ function setupWebServer()
 
     registerAtController()
 end
-
-local nodeID, bytesPerLed, ledCount, segments, segmentList
 
 function loadConfig()
     if file.exists("node.config") then
@@ -184,9 +153,6 @@ function splitString (inputstr, sep)
     end
     return t
 end
-
-local isConnectedToController = false
-local reconnectionDelay = 5000
 
 function registerAtController()
     print("Try to register at controller")
@@ -276,7 +242,6 @@ if file.exists("OTA.update") then
         end)
     end)
 else
-    LEDs.init()
     loadConfig()
     setupWebServer()
 end

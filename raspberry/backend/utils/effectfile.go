@@ -3,10 +3,12 @@ package utils
 import (
 	"bytes"
 	"encoding/binary"
+	"github.com/lucasb-eyer/go-colorful"
 	"log"
+	"math/rand"
 )
 
-const defaultDelay = 250
+const defaultDelay = 50
 
 type EffectFormatHeader struct {
 	SchemaVersion int16
@@ -21,7 +23,7 @@ var (
 	shiftCircularFlag int32 = 1 << 1
 )
 
-func generateEffectHeader(delay int16, bytesPerLed int16, ledCount int16, repeat bool, shiftCircular bool) []byte {
+func generateEffectHeader(delay int16, bytesPerLed int, ledCount int, repeat bool, shiftCircular bool) []byte {
 	var flags int32
 	if repeat {
 		flags = flags | repeatFlag
@@ -29,7 +31,7 @@ func generateEffectHeader(delay int16, bytesPerLed int16, ledCount int16, repeat
 	if shiftCircular {
 		flags = flags | shiftCircularFlag
 	}
-	header := EffectFormatHeader{1, delay, bytesPerLed, ledCount, flags}
+	header := EffectFormatHeader{1, delay, int16(bytesPerLed), int16(ledCount), flags}
 	log.Printf("effect header created %v", header)
 	buf := new(bytes.Buffer)
 	err := binary.Write(buf, binary.LittleEndian, header)
@@ -40,49 +42,78 @@ func generateEffectHeader(delay int16, bytesPerLed int16, ledCount int16, repeat
 	return buf.Bytes()
 }
 
-func GenerateColorFadeEffect(bytesPerLed int16, ledCount int16) []byte {
+func GenerateColorFadeEffect(bytesPerLed int, ledCount int, hexColor string) ([]byte, error) {
+	var values = generateEffectHeader(defaultDelay*2, bytesPerLed, ledCount, true, false)
+	var c, err = colorful.Hex("#"+hexColor)
+	if err != nil {
+		return nil, err
+	}
+	var steps = 32
+	var inc = 0.8 / float64(steps)
+	var h,s,v = c.Hsv()
+	s = 1
+	v = 0.2
+
+	for j := 0; j < steps; j++ {
+		r, g, b := colorful.Hsv(h, s, v).RGB255()
+		for i := 0; i < ledCount; i++ {
+			values = append(values, r)
+			values = append(values, g)
+			values = append(values, b)
+			values = append(values, 0)
+		}
+		v += inc
+	}
+	for j := 0; j < steps; j++ {
+		r, g, b := colorful.Hsv(h, s, v).RGB255()
+		for i := 0; i < ledCount; i++ {
+			values = append(values, r)
+			values = append(values, g)
+			values = append(values, b)
+			values = append(values, 0)
+		}
+		v -= inc
+	}
+	return values, nil
+}
+
+func GenerateRainbowFade(bytesPerLed int, ledCount int) []byte {
 	var values = generateEffectHeader(defaultDelay, bytesPerLed, ledCount, true, false)
 
-	for j := 0; j < 10; j++ {
-		for i := 0; i < int(ledCount); i++ {
-			values = append(values, 255)
+	var steps = 200
+	var inc = 360.0 / float64(steps)
+	var hue = rand.Float64() * 360
+	for j := 0; j < steps; j++ {
+		r, g, b := colorful.Hsv(hue, 1, 1).RGB255()
+		for i := 0; i < ledCount; i++ {
+			values = append(values, r)
+			values = append(values, g)
+			values = append(values, b)
 			values = append(values, 0)
-			values = append(values, 0)
-			values = append(values, 0)
+		}
+		hue += inc
+		if hue > 360 {
+			hue = 0
 		}
 	}
 	return values
 }
 
-func GenerateRainbowFade(bytesPerLed int16, ledCount int16) []byte {
-	var values = generateEffectHeader(defaultDelay, bytesPerLed, ledCount, true, false)
-
-	hsl := HSL{S: 1, L: 0.5}
-	for j := 0; j < 50; j++ {
-		rgb := hsl.ToRGB()
-		for i := 0; i < int(ledCount); i++ {
-			values = append(values, byte(rgb.R*255))
-			values = append(values, byte(rgb.G*255))
-			values = append(values, byte(rgb.B*255))
-			values = append(values, 0)
-		}
-		hsl.H = hsl.H + 0.002
-	}
-	return values
-}
-
-func GenerateRunningRainbow(bytesPerLed int16, ledCount int16) []byte {
+func GenerateRunningRainbow(bytesPerLed int, ledCount int) []byte {
 	var values = generateEffectHeader(defaultDelay, bytesPerLed, ledCount, true, true)
 
-	hsl := HSL{S: 1, L: 0.5}
-	hueStepSize := 1.0 / float64(ledCount)
-	for i := 0; i < int(ledCount); i++ {
-		rgb := hsl.ToRGB()
-		values = append(values, byte(rgb.R*255))
-		values = append(values, byte(rgb.G*255))
-		values = append(values, byte(rgb.B*255))
+	hueStepSize := 360.0 / float64(ledCount)
+	var hue = rand.Float64() * 360
+	for i := 0; i < ledCount; i++ {
+		r, g, b := colorful.Hsv(hue, 1, 1).RGB255()
+		values = append(values, r)
+		values = append(values, g)
+		values = append(values, b)
 		values = append(values, 0)
-		hsl.H = hsl.H + hueStepSize
+		hue += hueStepSize
+		if hue > 360 {
+			hue = 0
+		}
 	}
 	return values
 }

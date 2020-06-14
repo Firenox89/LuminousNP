@@ -27,7 +27,7 @@ type SetConfigRequest struct {
 func ServeWeb(
 	connectedMCUs *[]*nodeMCU.ConnectedNode,
 	onApplyConfig func(request SetConfigRequest),
-	effectDataGetter func(effectId int, bytesPerLED int, ledCount int) []byte) {
+	effectDataGetter func(nodeID string) []byte) {
 	log.Printf("Start Web Server")
 	http.HandleFunc("/setConfig", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -64,32 +64,16 @@ func ServeWeb(
 
 	http.HandleFunc("/effectFile", func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Serve effect file to %s", r.RemoteAddr)
-		effectIDs, ok := r.URL.Query()["effect"]
+		nodeIDs, ok := r.URL.Query()["id"]
 		if !ok {
 			log.Printf("Effect parameter not found %v", r.URL.Query())
-		}
-		effectID, err := strconv.Atoi(effectIDs[0])
-
-		bytesPerLEDs, ok := r.URL.Query()["byteperled"]
-		if !ok {
-			log.Printf("Effect parameter not found %v", r.URL.Query())
-		}
-		bytesPerLED, err := strconv.Atoi(bytesPerLEDs[0])
-
-		ledCounts, ok := r.URL.Query()["ledcount"]
-		if !ok {
-			log.Printf("Effect parameter not found %v", r.URL.Query())
-		}
-		ledCount, err := strconv.Atoi(ledCounts[0])
-
-		if err != nil {
-			log.Printf("error on parsing parameters %v", err)
-			w.WriteHeader(500)
 		} else {
-			effectData := effectDataGetter(effectID, bytesPerLED, ledCount)
+			nodeID := nodeIDs[0]
+
+			effectData := effectDataGetter(nodeID)
 			w.Header().Add("Content-Length", strconv.Itoa(len(effectData)))
 
-			_, err = w.Write(effectData)
+			_, err := w.Write(effectData)
 			if err != nil {
 				log.Printf("error on sending effect file %v", err)
 			}

@@ -6,7 +6,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"strconv"
 	"time"
 )
 
@@ -88,8 +87,8 @@ func (n *ConnectedNode) SendEffectData(effectData []byte) {
 	}
 }
 
-func (n *ConnectedNode) StartEffect(effectId int) error {
-	req, err := http.NewRequest("POST", "http://"+n.IP+"/startEffect?id="+strconv.Itoa(effectId), nil)
+func (n *ConnectedNode) StartEffect() error {
+	req, err := http.NewRequest("POST", "http://"+n.IP+"/startEffect", nil)
 	if err == nil {
 		return sendRequest(req)
 	}
