@@ -51,7 +51,7 @@ func ServeWeb(
 	http.HandleFunc("/getConnectedNodeMCUs", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Content-Type", "application/json")
-		err := json.NewEncoder(w).Encode(connectedMCUs)
+		err := json.NewEncoder(w).Encode(*connectedMCUs)
 		if err != nil {
 			log.Fatal(err)
 		}

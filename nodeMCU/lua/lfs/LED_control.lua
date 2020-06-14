@@ -28,7 +28,7 @@ function RGB2RGBW(r, g, b)
 end
 
 function rainbow(level)
-    co = coroutine.create(function()
+    return coroutine.create(function()
         local hue = 0
         local saturation = 255
         local brightness = 255
@@ -41,11 +41,10 @@ function rainbow(level)
             coroutine.yield()
         end
     end)
-    return co
 end
 
 function rainbowRoad(level)
-    co = coroutine.create(function()
+    return coroutine.create(function()
         local bufferFilled = false
         while (true) do
             updateLevelBuffer(level, function(buffer)
@@ -68,11 +67,10 @@ function rainbowRoad(level)
             coroutine.yield()
         end
     end)
-    return co
 end
 
 function rainbowSnake(level)
-    co = coroutine.create(function()
+    return coroutine.create(function()
         local bufferFilled = false
         while (true) do
             updateLevelBuffer(level, function(buffer)
@@ -95,11 +93,10 @@ function rainbowSnake(level)
             coroutine.yield()
         end
     end)
-    return co
 end
 
 function runningLight(level, hue)
-    co = coroutine.create(function()
+    return coroutine.create(function()
         local bufferFilled = false
         while (true) do
             updateLevelBuffer(level, function(buffer)
@@ -118,11 +115,10 @@ function runningLight(level, hue)
             coroutine.yield()
         end
     end)
-    return co
 end
 
 function pulsingLight(level, hue)
-    co = coroutine.create(function()
+    return coroutine.create(function()
         local brightnessInc = 3
         local brightness = 0
         while (true) do
@@ -137,7 +133,6 @@ function pulsingLight(level, hue)
             coroutine.yield()
         end
     end)
-    return co
 end
 
 function updateLevelBuffer(level, bufferModifyFunc)
@@ -172,7 +167,7 @@ function off(level)
 end
 
 function fillRGB(level, g, r, b)
-    cg, cr, cb, cw = RGB2RGBW(g, r, b)
+    local cg, cr, cb, cw = RGB2RGBW(g, r, b)
     fillRGBW(level, cg, cr, cb, cw)
 end
 
@@ -236,7 +231,7 @@ function setPulsingLight(level, hue)
 end
 
 function bufferShift(level)
-    co = coroutine.create(function()
+    return coroutine.create(function()
         while (true) do
             updateLevelBuffer(level, function(buffer)
                 buffer:shift(1, ws2812.SHIFT_CIRCULAR)
@@ -244,11 +239,10 @@ function bufferShift(level)
             coroutine.yield()
         end
     end)
-    return co
 end
 
 function playFrames(bytesPerLed, ledCount, level)
-    co = coroutine.create(function()
+    return coroutine.create(function()
         while (true) do
             updateLevelBuffer(level, function(buffer)
                 loadEffectFrameIntoBuffer(bytesPerLed, ledCount, buffer)
@@ -256,7 +250,6 @@ function playFrames(bytesPerLed, ledCount, level)
             coroutine.yield()
         end
     end)
-    return co
 end
 
 function loadEffectFrameIntoBuffer(bytesPerLed, ledCount, ledbuffer)
@@ -302,6 +295,7 @@ function playEffect()
         if isShiftCircular > 0 then
             loadEffectFrameIntoBuffer(bytesPerLed, ledCount, buffer)
             setEffect(level, bufferShift(level))
+            file.close()
         else
             setEffect(level, playFrames(bytesPerLed, ledCount, level))
         end

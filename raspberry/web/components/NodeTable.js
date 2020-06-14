@@ -2,6 +2,8 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import clsx from 'clsx';
 import {lighten, makeStyles} from '@material-ui/core/styles';
+import Box from '@material-ui/core/Box';
+import Collapse from '@material-ui/core/Collapse';
 import Table from '@material-ui/core/Table';
 import TableBody from '@material-ui/core/TableBody';
 import TableCell from '@material-ui/core/TableCell';
@@ -14,6 +16,9 @@ import Toolbar from '@material-ui/core/Toolbar';
 import Typography from '@material-ui/core/Typography';
 import Paper from '@material-ui/core/Paper';
 import Checkbox from '@material-ui/core/Checkbox';
+import IconButton from "@material-ui/core/IconButton";
+import KeyboardArrowDownIcon from '@material-ui/icons/KeyboardArrowDown';
+import KeyboardArrowUpIcon from '@material-ui/icons/KeyboardArrowUp';
 
 function descendingComparator(a, b, orderBy) {
     if (b[orderBy] < a[orderBy]) {
@@ -44,9 +49,9 @@ function stableSort(array, comparator) {
 const headCells = [
     {id: 'id', numeric: false, disablePadding: true, label: 'ID'},
     {id: 'isonline', numeric: false, disablePadding: true, label: 'Online'},
-    {id: 'ip', numeric: true, disablePadding: false, label: 'IP'},
     {id: 'ledcount', numeric: true, disablePadding: false, label: 'LED Count'},
     {id: 'segmentcount', numeric: true, disablePadding: false, label: 'Segments'},
+    {id: 'ip', numeric: true, disablePadding: false, label: 'IP'},
 ];
 
 function EnhancedTableHead(props) {
@@ -58,6 +63,7 @@ function EnhancedTableHead(props) {
     return (
         <TableHead>
             <TableRow>
+                <TableCell/>
                 <TableCell padding="checkbox">
                     <Checkbox
                         indeterminate={numSelected > 0 && numSelected < rowCount}
@@ -179,16 +185,8 @@ export default function EnhancedTable(props) {
     const [orderBy, setOrderBy] = React.useState('ID');
     const [page, setPage] = React.useState(0);
     const [rowsPerPage, setRowsPerPage] = React.useState(5);
-    const [connectedDevices, setConnectedDevices] = React.useState([]);
 
-    if (connectedDevices.length === 0) {
-        fetch("/getConnectedNodeMCUs")
-            .then(response => response.json())
-            .then(data => {
-                console.log(data)
-                setConnectedDevices(data)
-            })
-    }
+    const [open, setOpen] = React.useState(false);
 
     const handleRequestSort = (event, property) => {
         const isAsc = orderBy === property && order === 'asc';
@@ -198,7 +196,7 @@ export default function EnhancedTable(props) {
 
     const handleSelectAllClick = (event) => {
         if (event.target.checked) {
-            const newSelecteds = connectedDevices.map((n) => n.name);
+            const newSelecteds = props.connectedDevices.map((n) => n.ID);
             props.setSelected(newSelecteds);
             return;
         }
@@ -236,7 +234,7 @@ export default function EnhancedTable(props) {
 
     const isSelected = (name) => props.selected.indexOf(name) !== -1;
 
-    const emptyRows = rowsPerPage - Math.min(rowsPerPage, connectedDevices.length - page * rowsPerPage);
+    const emptyRows = rowsPerPage - Math.min(rowsPerPage, props.connectedDevices.length - page * rowsPerPage);
 
     return (
         <div className={classes.root}>
@@ -256,47 +254,66 @@ export default function EnhancedTable(props) {
                             orderBy={orderBy}
                             onSelectAllClick={handleSelectAllClick}
                             onRequestSort={handleRequestSort}
-                            rowCount={connectedDevices.length}
+                            rowCount={props.connectedDevices.length}
                         />
                         <TableBody>
-                            {stableSort(connectedDevices, getComparator(order, orderBy))
+                            {stableSort(props.connectedDevices, getComparator(order, orderBy))
                                 .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                                 .map((row, index) => {
-                                    console.log(row)
                                     const isItemSelected = isSelected(row.ID);
                                     const labelId = `enhanced-table-checkbox-${index}`;
 
+
                                     return (
-                                        <TableRow
-                                            hover
-                                            onClick={(event) => handleClick(event, row.ID)}
-                                            role="checkbox"
-                                            aria-checked={isItemSelected}
-                                            tabIndex={-1}
-                                            key={row.ID}
-                                            selected={isItemSelected}
-                                        >
-                                            <TableCell padding="checkbox">
-                                                <Checkbox
-                                                    checked={isItemSelected}
-                                                    disabled={!row.IsConnected}
-                                                    inputProps={{'aria-labelledby': labelId}}
-                                                />
-                                            </TableCell>
-                                            <TableCell component="th" id={labelId} scope="row" padding="none">
-                                                {row.ID}
-                                            </TableCell>
-                                            <TableCell padding="checkbox">
-                                                <Checkbox
-                                                    checked={row.IsConnected}
-                                                    disabled={true}
-                                                    inputProps={{'aria-labelledby': labelId}}
-                                                />
-                                            </TableCell>
-                                            <TableCell align="right">{row.IP}</TableCell>
-                                            <TableCell align="right">{row.LedCount}</TableCell>
-                                            <TableCell align="right">{row.Segments}</TableCell>
-                                        </TableRow>
+                                        <React.Fragment key={row.ID}>
+                                            <TableRow
+                                                hover
+                                                role="checkbox"
+                                                aria-checked={isItemSelected}
+                                                tabIndex={-1}
+                                                key={row.ID}
+                                                selected={isItemSelected}
+                                            >
+                                                <TableCell>
+                                                    <IconButton aria-label="expand row" size="small"
+                                                                onClick={() => setOpen(!open)}>
+                                                        {open ? <KeyboardArrowUpIcon/> : <KeyboardArrowDownIcon/>}
+                                                    </IconButton>
+                                                </TableCell>
+                                                <TableCell padding="checkbox">
+                                                    <Checkbox
+                                                        checked={isItemSelected}
+                                                        onClick={(event) => handleClick(event, row.ID)}
+                                                        disabled={!row.IsConnected}
+                                                        inputProps={{'aria-labelledby': labelId}}
+                                                    />
+                                                </TableCell>
+                                                <TableCell id={labelId} scope="row" padding="none">
+                                                    {row.ID}
+                                                </TableCell>
+                                                <TableCell padding="checkbox">
+                                                    <Checkbox
+                                                        checked={row.IsConnected}
+                                                        disabled={true}
+                                                        inputProps={{'aria-labelledby': labelId}}
+                                                    />
+                                                </TableCell>
+                                                <TableCell align="right" padding="none">{row.LedCount}</TableCell>
+                                                <TableCell align="right" padding="none">{row.Segments.length}</TableCell>
+                                                <TableCell align="right" padding="none">{row.IP}</TableCell>
+                                            </TableRow>
+                                            <TableRow>
+                                                <TableCell style={{paddingBottom: 0, paddingTop: 0}} colSpan={6}>
+                                                    <Collapse in={open} timeout="auto" unmountOnExit>
+                                                        <Box margin={1}>
+                                                            <Typography variant="h6" gutterBottom component="div">
+                                                                History
+                                                            </Typography>
+                                                        </Box>
+                                                    </Collapse>
+                                                </TableCell>
+                                            </TableRow>
+                                        </React.Fragment>
                                     );
                                 })}
                             {emptyRows > 0 && (
@@ -310,7 +327,7 @@ export default function EnhancedTable(props) {
                 <TablePagination
                     rowsPerPageOptions={[5, 10, 25]}
                     component="div"
-                    count={connectedDevices.length}
+                    count={props.connectedDevices.length}
                     rowsPerPage={rowsPerPage}
                     page={page}
                     onChangePage={handleChangePage}

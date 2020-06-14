@@ -67,7 +67,7 @@ func (c *Controller) parseRegistration(buffer []byte, ip string, conn *net.TCPCo
 				break
 			}
 		}
-		node := NewConnectionNode(ip, request.ID, request.LedCount, request.BytesPerLED, conn)
+		node := NewConnectionNode(ip, request.ID, request.LedCount, request.BytesPerLED, request.Segments, conn)
 		if listIndex != -1 {
 			c.ConnectedMCUs[listIndex] = node
 		} else {

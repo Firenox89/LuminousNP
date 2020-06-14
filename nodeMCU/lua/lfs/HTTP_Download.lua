@@ -63,7 +63,11 @@ finalise = function(sck)
     if (s and size == s.size) then
         callback()
     else
-        print"Invalid save of image file"
+        if (s) then
+            print"File not saved"
+        else
+            print("Size mismatch got " .. s.size .. ", needed " .. size)
+        end
     end
 end
 

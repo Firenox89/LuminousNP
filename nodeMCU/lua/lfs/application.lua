@@ -6,10 +6,10 @@ function setupWebServer()
     httpServer:listen(80)
 
     httpServer:use('/OTA', function(req, res)
+        res:send(200)
         file.open("OTA.update", "w")
         file.close()
         node.restart()
-        res:send('Fetching')
     end)
 
     httpServer:use('/debugStrings', function(req, res)
@@ -24,7 +24,7 @@ function setupWebServer()
     end)
 
     httpServer:use('/on', function(req, res)
-        level = tonumber(req.query.level)
+        local level = tonumber(req.query.level)
         if level == nil then
             level = 0
         end
@@ -34,7 +34,7 @@ function setupWebServer()
     end)
 
     httpServer:use('/off', function(req, res)
-        level = tonumber(req.query.level)
+        local level = tonumber(req.query.level)
         if level == nil then
             level = 0
         end
@@ -44,11 +44,11 @@ function setupWebServer()
     end)
 
     httpServer:use('/fill', function(req, res)
-        level = tonumber(req.query.level)
-        rawColor = req.query.color
-        r = tonumber(rawColor:sub(1, 2), 16)
-        g = tonumber(rawColor:sub(3, 4), 16)
-        b = tonumber(rawColor:sub(5, 6), 16)
+        local level = tonumber(req.query.level)
+        local rawColor = req.query.color
+        local r = tonumber(rawColor:sub(1, 2), 16)
+        local g = tonumber(rawColor:sub(3, 4), 16)
+        local b = tonumber(rawColor:sub(5, 6), 16)
         if r and r >= 0 and r <= 255
                 and b and b >= 0 and b <= 255
                 and g and g >= 0 and g <= 255
@@ -95,26 +95,13 @@ function setupWebServer()
         res:send(200)
     end)
 
-    httpServer:use('/presets', function(req, res)
-        effectJson = "[\"Rainbow\", \"Rainbow Road\", \"Rainbow Snake\", \"Running Light\", \"Pulsing Light\"]"
-        res:send(effectJson)
-    end)
-
-    httpServer:use('/loadPreset', function(req, res)
-        preset = req.query.preset
-        print("Load " .. preset)
-    end)
-
-    httpServer:use('/savePreset', function(req, res)
-        preset = req.query.preset
-        print("Save " .. preset)
-    end)
-
     httpServer:use('/startStream', function(req, res)
         openUDPSocket()
+        res:send(200)
     end)
 
     httpServer:use('/restart', function(req, res)
+        res:send(200)
         node.restart()
     end)
 
@@ -146,6 +133,7 @@ function setupWebServer()
 
         saveConfig(id, bytesPerLed, ledcount, segments)
         loadConfig()
+        res:send(200)
     end)
 
     registerAtController()

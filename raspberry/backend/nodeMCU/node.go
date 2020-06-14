@@ -15,6 +15,7 @@ type ConnectedNode struct {
 	ID          string
 	LedCount    int
 	BytesPerLED int
+	Segments    []int
 	IsConnected *bool
 	Connection  net.Conn `json:"-"`
 }
@@ -24,12 +25,14 @@ func NewConnectionNode(
 	ID string,
 	LedCount int,
 	BytesPerLED int,
+	Segments []int,
 	Connection net.Conn) *ConnectedNode {
 	node := &ConnectedNode{
 		IP:          IP,
 		ID:          ID,
 		LedCount:    LedCount,
 		BytesPerLED: BytesPerLED,
+		Segments: Segments,
 		IsConnected: new(bool),
 		Connection:  Connection,
 	}

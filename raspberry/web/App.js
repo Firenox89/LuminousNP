@@ -1,14 +1,13 @@
 import React from 'react';
 import {makeStyles} from '@material-ui/core/styles';
-
-import {Button, Container} from '@material-ui/core';
+import {Container} from '@material-ui/core';
 import {LEDConfig} from './components/LEDConfig'
 import NodeTable from "./components/NodeTable";
+import Grid from "@material-ui/core/Grid";
 
 const useStyles = makeStyles(theme => ({
     root: {
         width: 400,
-        margin: 16,
     },
     bullet: {
         display: 'inline-block',
@@ -26,6 +25,11 @@ const useStyles = makeStyles(theme => ({
     },
     button: {
         margin: 8
+    },
+    paper: {
+        width: '100%',
+        padding: 8,
+        marginBottom: theme.spacing(2),
     },
     formControl: {
         margin: theme.spacing(1),
@@ -45,16 +49,21 @@ export default function App() {
 
     const [selected, setSelected] = React.useState([]);
 
-    if (connectedDevices.length === 0) {
-        fetch("/getConnectedNodeMCUs")
-            .then(response => response.json())
-            .then(data => {
-                console.log(data)
-                setConnectedDevices(data)
-            })
-    }
+    React.useEffect(() => {
+        const timeout = 1000
+        const interval = setInterval(() => {
+            fetch("/getConnectedNodeMCUs")
+                .then(response => response.json())
+                .then(data => {
+                    setConnectedDevices(data)
+                })
+        }, timeout);
+        return () => {
+            clearInterval(interval);
+        };
+    }, []);
 
-    console.log("device", connectedDevices)
+    //console.log("device", connectedDevices)
     const buildConfig = () => {
         return {
             config: {
@@ -95,27 +104,33 @@ export default function App() {
 
     return (
         <Container>
-            <LEDConfig classes={classes}
-                       power={ledsOn}
-                       setPower={event => {
-                           setLedsOn(event.target.checked);
-                       }}
-                       useWhite={useWhite}
-                       setUseWhite={event => {
-                           setUseWhite(event.target.checked);
-                       }}
-                       selectedEffect={effect}
-                       onEffectChange={event => {
-                           setEffect(event.target.value)
-                       }}
-                       color={color}
-                       onColorChange={color => setColor(color.hex)}/>
-
-            <NodeTable
-                selected={selected}
-                setSelected={setSelected}
-            />
-            <Button variant="contained" className={classes.button} onClick={onApply}>Apply</Button>
+            <Grid container spacing={1}>
+                <Grid item xs={12} sm={8}>
+                    <NodeTable
+                        selected={selected}
+                        setSelected={setSelected}
+                        connectedDevices={connectedDevices}
+                    />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                    <LEDConfig classes={classes}
+                               power={ledsOn}
+                               setPower={event => {
+                                   setLedsOn(event.target.checked);
+                               }}
+                               useWhite={useWhite}
+                               setUseWhite={event => {
+                                   setUseWhite(event.target.checked);
+                               }}
+                               selectedEffect={effect}
+                               onEffectChange={event => {
+                                   setEffect(event.target.value)
+                               }}
+                               color={color}
+                               onColorChange={color => setColor(color.hex)}
+                               onApply={onApply}/>
+                </Grid>
+            </Grid>
         </Container>
     );
 }
