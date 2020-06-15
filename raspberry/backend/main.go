@@ -2,23 +2,100 @@ package main
 
 import (
 	"log"
+	"sync"
 	"utils/nodeMCU"
 	"utils/utils"
 	"utils/web"
 )
 
-var effectStore = make(map[string][]byte)
+var (
+	effectStore = make(map[string][] byte)
+    effectStoreMutex = sync.RWMutex{}
+)
+
+
+var effectList = []web.Effect{
+	{0, "Just White", false, func(node *nodeMCU.ConnectedNode, config web.LEDConfig) error {
+		return node.PowerOn()
+	}},
+	{1, "Fill Color", true, func(node *nodeMCU.ConnectedNode, config web.LEDConfig) error {
+		return node.ColorFill(config.Color)
+	}},
+	{2, "FadeInOut", true, func(node *nodeMCU.ConnectedNode, config web.LEDConfig) error {
+		effectData, err := utils.GenerateColorFadeEffect(node.BytesPerLED, node.LedCount, config.Color)
+		if err != nil {
+			return err
+		}
+		effectStoreMutex.Lock()
+		effectStore[node.ID] = effectData
+		effectStoreMutex.Unlock()
+		return node.StartEffect()
+	}},
+	{3, "RainbowFade", false, func(node *nodeMCU.ConnectedNode, config web.LEDConfig) error {
+		effectData := utils.GenerateRainbowFade(node.BytesPerLED, node.LedCount)
+		effectStoreMutex.Lock()
+		effectStore[node.ID] = effectData
+		effectStoreMutex.Unlock()
+		return node.StartEffect()
+	}},
+	{4, "Rainbow Rotation", false, func(node *nodeMCU.ConnectedNode, config web.LEDConfig) error {
+		effectData := utils.GenerateRunningRainbow(node.BytesPerLED, node.LedCount)
+		effectStoreMutex.Lock()
+		effectStore[node.ID] = effectData
+		effectStoreMutex.Unlock()
+		return node.StartEffect()
+	}},
+	{5, "Warm Rotation", false, func(node *nodeMCU.ConnectedNode, config web.LEDConfig) error {
+		effectData, err := utils.GenerateRunningWarmColors(node.BytesPerLED, node.LedCount)
+		if err != nil {
+			return err
+		}
+		effectStoreMutex.Lock()
+		effectStore[node.ID] = effectData
+		effectStoreMutex.Unlock()
+		return node.StartEffect()
+	}},
+	{6, "Happy Rotation", false, func(node *nodeMCU.ConnectedNode, config web.LEDConfig) error {
+		effectData, err := utils.GenerateRunningHappyColors(node.BytesPerLED, node.LedCount)
+		if err != nil {
+			return err
+		}
+		effectStoreMutex.Lock()
+		effectStore[node.ID] = effectData
+		effectStoreMutex.Unlock()
+		return node.StartEffect()
+	}},
+	{7, "Warm Fade", false, func(node *nodeMCU.ConnectedNode, config web.LEDConfig) error {
+		effectData := utils.GenerateWarmColorFade(node.BytesPerLED, node.LedCount)
+		effectStoreMutex.Lock()
+		effectStore[node.ID] = effectData
+		effectStoreMutex.Unlock()
+		return node.StartEffect()
+	}},
+	{8, "Interpolate Test", false, func(node *nodeMCU.ConnectedNode, config web.LEDConfig) error {
+		effectData := utils.GenerateInterpolateTest(node.BytesPerLED, node.LedCount)
+		effectStoreMutex.Lock()
+		effectStore[node.ID] = effectData
+		effectStoreMutex.Unlock()
+		return node.StartEffect()
+	}},
+}
 
 func main() {
 	nodeMCUController := nodeMCU.NewController()
 	go nodeMCUController.StartControllerService()
 
-	web.ServeWeb(&nodeMCUController.ConnectedMCUs,
+	web.ServeWeb(
+		&effectList,
+		&nodeMCUController.ConnectedMCUs,
 		func(request web.SetConfigRequest) {
 			processNodesConfig(request, nodeMCUController)
 		},
 		func(effectId string) []byte {
-			return effectStore[effectId]
+			effectStoreMutex.RLock()
+			data := effectStore[effectId]
+			effectStoreMutex.RUnlock()
+			return data
 		})
 
 	//startUDPServer()
@@ -47,30 +124,7 @@ func sendConfig(request web.SetConfigRequest, node *nodeMCU.ConnectedNode) {
 	if !request.Config.Power {
 		err = node.PowerOff()
 	} else {
-		switch request.Config.Effect {
-		case 0:
-			err = node.PowerOn()
-			break
-		case 1:
-			err = node.ColorFill(request.Config.Color)
-			break
-		case 2:
-			effectData, err := utils.GenerateColorFadeEffect(node.BytesPerLED, node.LedCount, request.Config.Color)
-			if err == nil {
-				effectStore[node.ID] = effectData
-
-				err = node.StartEffect()
-			}
-			break
-		case 3:
-			effectStore[node.ID] = utils.GenerateRainbowFade(node.BytesPerLED, node.LedCount)
-			err = node.StartEffect()
-			break
-		case 4:
-			effectStore[node.ID] = utils.GenerateRunningRainbow(node.BytesPerLED, node.LedCount)
-			err = node.StartEffect()
-			break
-		}
+		err = effectList[request.Config.Effect].Handler(node, request.Config)
 	}
 	if err != nil {
 		log.Printf("Failed set node %s, err %v", node.ID, err)

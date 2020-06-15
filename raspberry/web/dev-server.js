@@ -22,6 +22,9 @@ const server = new ParcelProxyServer({
     '/getConnectedNodeMCUs': {
       target: 'http://nodemcu-controller'
     },
+    '/getEffectList': {
+      target: 'http://nodemcu-controller'
+    },
   }
 });
 

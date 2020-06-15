@@ -9,9 +9,39 @@ import {SliderPicker} from "react-color";
 import * as PropTypes from "prop-types";
 import React from "react";
 import Paper from "@material-ui/core/Paper";
-import {Button, Container} from "@material-ui/core";
+import {Button} from "@material-ui/core";
 
 export function LEDConfig(props) {
+    const [effectList, setEffectList] = React.useState();
+
+    if (!effectList) {
+        fetch("/getEffectList")
+            .then(response => response.json())
+            .then(data => {
+                setEffectList(data)
+            })
+    }
+
+    const buildEffectMenuItems = () => {
+        if (effectList) {
+            return effectList.map(value => {
+                return (
+                    <MenuItem key={value.ID} value={value.ID}>{value.Name}</MenuItem>
+                )
+            })
+        }
+    }
+
+    const needsColor = () => {
+        if (effectList) {
+            const effect = effectList.find(value => value.ID === props.selectedEffect)
+            if (effect) {
+                return effect.NeedsColor
+            }
+        }
+        return false
+    }
+
     return <Paper className={props.classes.paper}>
         <Typography className={props.classes.title} gutterBottom>
             Config
@@ -45,40 +75,34 @@ export function LEDConfig(props) {
             Effect
         </Typography>
         <FormControl variant="outlined" className={props.classes.formControl}>
-            <InputLabel id="demo-simple-select-outlined-label">
-                Effect
-            </InputLabel>
             <Select
                 id="demo-simple-select-outlined"
                 value={props.selectedEffect}
                 onChange={(props.onEffectChange)}
             >
-                <MenuItem value={0}>Just White</MenuItem>
-                <MenuItem value={1}>Fill</MenuItem>
-                <MenuItem value={2}>FadeInOut</MenuItem>
-                <MenuItem value={3}>RainbowFade</MenuItem>
-                <MenuItem value={4}>Rainbow</MenuItem>
-                <MenuItem value={5}>RunningRainbow</MenuItem>
-                <MenuItem value={6}>RunningColor</MenuItem>
+                {buildEffectMenuItems()}
             </Select>
         </FormControl>
-        <Typography className={props.classes.subtitle} gutterBottom>
-            Color
-        </Typography>
+        <Button variant="contained" className={props.classes.button} onClick={props.onApply}>Apply</Button>
         {/*<HuePicker*/}
         {/*    color={props.color}*/}
         {/*    onChange={props.onColorChange}*/}
         {/*    onChangeComplete={props.onChange}*/}
         {/*/>*/}
-        <div style={{margin: 16}}>
-            <SliderPicker
-                color={props.color}
-                onChange={props.onColorChange}
-                onChangeComplete={props.onChange}
-            />
+        {needsColor() &&
+        <div>
+            <Typography className={props.classes.subtitle} gutterBottom>
+                Color
+            </Typography>
+            <div style={{margin: 16}}>
+                <SliderPicker
+                    color={props.color}
+                    onChange={props.onColorChange}
+                    onChangeComplete={props.onChange}
+                />
+            </div>
         </div>
-
-        <Button variant="contained" className={props.classes.button} onClick={props.onApply}>Apply</Button>
+        }
     </Paper>;
 }
 

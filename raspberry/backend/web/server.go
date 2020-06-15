@@ -8,6 +8,13 @@ import (
 	"utils/nodeMCU"
 )
 
+type Effect struct {
+	ID      int
+	Name    string
+	NeedsColor bool
+	Handler func(node *nodeMCU.ConnectedNode, config LEDConfig) error `json:"-"`
+}
+
 type LEDConfig struct {
 	Power    bool   `json:"power"`
 	UseWhite bool   `json:"useWhite"`
@@ -24,10 +31,7 @@ type SetConfigRequest struct {
 	Nodes  []Node    `json:"nodes"`
 }
 
-func ServeWeb(
-	connectedMCUs *[]*nodeMCU.ConnectedNode,
-	onApplyConfig func(request SetConfigRequest),
-	effectDataGetter func(nodeID string) []byte) {
+func ServeWeb(effectList *[]Effect, connectedMCUs *[]*nodeMCU.ConnectedNode, onApplyConfig func(request SetConfigRequest), effectDataGetter func(nodeID string) []byte) {
 	log.Printf("Start Web Server")
 	http.HandleFunc("/setConfig", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -45,6 +49,15 @@ func ServeWeb(
 			w.WriteHeader(500)
 		} else {
 			onApplyConfig(config)
+		}
+	})
+
+	http.HandleFunc("/getEffectList", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Content-Type", "application/json")
+		err := json.NewEncoder(w).Encode(*effectList)
+		if err != nil {
+			log.Fatal(err)
 		}
 	})
 
