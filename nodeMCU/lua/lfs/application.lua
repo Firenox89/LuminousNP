@@ -1,8 +1,7 @@
 LEDs = require 'LED_control'
 
 local nodeID, bytesPerLed, ledCount, segments, segmentList
-local isConnectedToController = false
-local reconnectionDelay = 5000
+local hearthbeatInterval = 10000
 
 function setupWebServer()
     print("setup webserver")
@@ -10,10 +9,19 @@ function setupWebServer()
     httpServer:listen(80)
 
     httpServer:use('/OTA', function(req, res)
-        res:send(200)
         file.open("OTA.update", "w")
         file.close()
-        node.restart()
+        node.task.post(function()
+            node.restart()
+        end)
+        res:send(200)
+    end)
+
+    httpServer:use('/restart', function(req, res)
+        node.task.post(function()
+            node.restart()
+        end)
+        res:send(200)
     end)
 
     httpServer:use('/debugStrings', function(req, res)
@@ -72,11 +80,6 @@ function setupWebServer()
     httpServer:use('/startStream', function(req, res)
         openUDPSocket()
         res:send(200)
-    end)
-
-    httpServer:use('/restart', function(req, res)
-        res:send(200)
-        node.restart()
     end)
 
     httpServer:use('/startEffect', function(req, res)
@@ -155,31 +158,23 @@ function splitString (inputstr, sep)
 end
 
 function registerAtController()
-    print("Try to register at controller")
-    if not isConnectedToController then
-        local socket = net.createConnection()
-        socket:on("connection", function(sck, c)
-            print("controller connected")
-            socket:send('{"id": "' .. nodeID .. '", "ledCount": ' .. ledCount .. ', "bytesPerLed": ' .. bytesPerLed .. ', "segments":[' .. segments .. ']}')
-            isConnectedToController = true
-        end)
-        socket:on("disconnection", function(sck, c)
-            print("controller disconnected")
-            isConnectedToController = false
-            if not tmr.create():alarm(reconnectionDelay, tmr.ALARM_SINGLE, function()
-                registerAtController()
+    tmr.create():alarm(hearthbeatInterval, tmr.ALARM_AUTO, function()
+        sendConfigToController()
+    end)
+end
+
+function sendConfigToController()
+    http.post('http://nodemcu-controller/register',
+            'Content-Type: application/json\r\n',
+            '{"id": "' .. nodeID ..
+                    '", "ledCount": ' .. ledCount ..
+                    ', "bytesPerLed": ' .. bytesPerLed ..
+                    ', "segments":[' .. segments .. ']}',
+            function(code, data)
+                if (code < 0) then
+                    print("Register at controller failed. code " .. code)
+                end
             end)
-            then
-                print("Failed to start reconnection timer.")
-            end
-        end)
-        socket:on('receive', function(sck, c)
-            socket:send('Pong')
-        end)
-        socket:connect(4488, "nodemcu-controller")
-    else
-        print("Already connected")
-    end
 end
 
 function printDump(o)

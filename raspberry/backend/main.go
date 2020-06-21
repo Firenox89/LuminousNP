@@ -83,13 +83,15 @@ var effectList = []web.Effect{
 
 func main() {
 	nodeMCUController := nodeMCU.NewController()
-	go nodeMCUController.StartControllerService()
 
 	web.ServeWeb(
 		&effectList,
 		&nodeMCUController.ConnectedMCUs,
 		func(request web.SetConfigRequest) {
 			processNodesConfig(request, nodeMCUController)
+		},
+		func(request web.RegistrationRequest, ip string) {
+			nodeMCUController.RegisterNode(ip, request.ID, request.LedCount, request.BytesPerLED, request.Segments)
 		},
 		func(effectId string) []byte {
 			effectStoreMutex.RLock()

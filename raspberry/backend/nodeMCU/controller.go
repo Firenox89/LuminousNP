@@ -1,79 +1,58 @@
 package nodeMCU
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"net"
 	"time"
 )
 
-type RegistrationRequest struct {
-	ID          string `json:"id"`
-	LedCount    int    `json:"ledCount"`
-	BytesPerLED int    `json:"bytesPerLed"`
-	Segments    []int  `json:"segments"`
-}
-
 type Controller struct {
 	ConnectedMCUs []*ConnectedNode
 }
 
 func NewController() *Controller {
-	return &Controller{make([]*ConnectedNode, 0)}
+	controller := &Controller{make([]*ConnectedNode, 0)}
+	controller.startHeartbeat()
+	return controller
 }
 
-func (c *Controller) StartControllerService() {
-	log.Printf("Listen on port 4488")
-	p := make([]byte, 2048)
-	addr := net.TCPAddr{
-		Port: 4488,
-		IP:   net.ParseIP("0.0.0.0"),
-	}
-	ser, err := net.ListenTCP("tcp", &addr)
-	if err != nil {
-		fmt.Printf("Some error %v\n", err)
-		return
-	}
-	for {
-		conn, err := ser.AcceptTCP()
-		ip := conn.RemoteAddr().(*net.TCPAddr).IP.String()
-		log.Printf("Got connection %s", ip)
-		byteCount, err := conn.Read(p)
-
-		log.Printf("Read %d bytes, from %s %s", byteCount, ip, p)
-		if err != nil {
-			log.Printf("Some error  %v", err)
-			continue
-		} else {
-			c.parseRegistration(p[:byteCount], ip, conn)
+func (c *Controller) RegisterNode(ip string, id string, ledCount int, bytesPerLed int, segments []int) {
+	listIndex := -1
+	for index, connectedMCU := range c.ConnectedMCUs {
+		if connectedMCU.ID == id {
+			listIndex = index
+			break
 		}
 	}
+	node := NewConnectionNode(ip, id, ledCount, bytesPerLed, segments)
+	if listIndex != -1 {
+		c.ConnectedMCUs[listIndex] = node
+	} else {
+		log.Printf("Register Node %s ", id)
+		c.ConnectedMCUs = append(c.ConnectedMCUs, node)
+	}
 }
 
-func (c *Controller) parseRegistration(buffer []byte, ip string, conn *net.TCPConn) {
-	log.Printf("got '%s'", buffer)
-	request := RegistrationRequest{}
-	err := json.Unmarshal(buffer, &request)
-	if err != nil {
-		log.Fatalf("error on parsing '%s', err %v", buffer, err)
-	} else {
-		log.Printf("NodeMCU registered %s %v", ip, request)
+func (c *Controller) startHeartbeat() {
+	ticker := time.NewTicker(15 * time.Second)
+	done := make(chan bool)
 
-		listIndex := -1
-		for index, connectedMCU := range c.ConnectedMCUs {
-			if connectedMCU.ID == request.ID {
-				listIndex = index
-				break
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				now := time.Now().Unix()
+				for _, node := range c.ConnectedMCUs {
+					if node.HeartbeatTimestamp < now-15 {
+						*node.IsConnected = false
+					}
+				}
 			}
 		}
-		node := NewConnectionNode(ip, request.ID, request.LedCount, request.BytesPerLED, request.Segments, conn)
-		if listIndex != -1 {
-			c.ConnectedMCUs[listIndex] = node
-		} else {
-			c.ConnectedMCUs = append(c.ConnectedMCUs, node)
-		}
-	}
+	}()
 }
 
 func (c *Controller) startUDPServer() {
@@ -94,8 +73,6 @@ func (c *Controller) startUDPServer() {
 		if err != nil {
 			fmt.Printf("Some error  %v", err)
 			continue
-		} else {
-			c.parseRegistration(p, remoteaddr.IP.String(), nil)
 		}
 		go sendUDPTestResponse(ser, remoteaddr)
 	}

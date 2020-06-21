@@ -164,7 +164,7 @@ function interpolateFrames(timer, bytesPerLed, frameCount, isRepeating, currentF
 
     local delta = (tmr.now() - startTime) / 1000
     local delay = 70 - delta
-    print(delay)
+    --print(delay)
     --timer overflow
     if (delta > delay) then
         delay = 1
