@@ -19,6 +19,9 @@ const server = new ParcelProxyServer({
     '/setConfig': {
       target: 'http://nodemcu-controller'
     },
+    '/getColorPaletteList': {
+      target: 'http://nodemcu-controller'
+    },
     '/getConnectedNodeMCUs': {
       target: 'http://nodemcu-controller'
     },

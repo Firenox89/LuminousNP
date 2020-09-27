@@ -10,17 +10,25 @@ import (
 )
 
 type Effect struct {
-	ID         int
-	Name       string
-	NeedsColor bool
-	Handler    func(node *nodeMCU.ConnectedNode, config LEDConfig) error `json:"-"`
+	ID                int
+	Name              string
+	NeedsColor        bool
+	NeedsColorPalette bool
+	Handler           func(node *nodeMCU.ConnectedNode, config LEDConfig) error `json:"-"`
+}
+
+type ColorPalette struct {
+	ID     int
+	Colors []string
 }
 
 type LEDConfig struct {
-	Power    bool   `json:"power"`
-	UseWhite bool   `json:"useWhite"`
-	Color    string `json:"color"`
-	Effect   int    `json:"effect"`
+	Power          bool   `json:"power"`
+	UseWhite       bool   `json:"useWhite"`
+	Color          string `json:"color"`
+	ColorPaletteId int    `json:"colorPaletteId"`
+	Effect         int    `json:"effect"`
+	Brightness     int    `json:"brightness"`
 }
 
 type RegistrationRequest struct {
@@ -31,7 +39,8 @@ type RegistrationRequest struct {
 }
 
 type Node struct {
-	ID string `json:"ID"`
+	ID             string `json:"ID"`
+	ActiveSegments []int  `json:"segments"`
 }
 
 type SetConfigRequest struct {
@@ -41,18 +50,67 @@ type SetConfigRequest struct {
 
 func ServeWeb(
 	effectList *[]Effect,
+	colorPaletteList *[]ColorPalette,
 	connectedMCUs *[]*nodeMCU.ConnectedNode,
 	onApplyConfig func(request SetConfigRequest),
 	onNodeRegisterRequest func(request RegistrationRequest, ip string),
 	effectDataGetter func(nodeID string) []byte) {
 	log.Printf("Start Web Server")
-	setupWebAPI(effectList, connectedMCUs, onApplyConfig)
+	setupWebAPI(effectList, colorPaletteList, connectedMCUs, onApplyConfig)
 
 	setupNodeAPI(effectDataGetter, onNodeRegisterRequest)
 
 	http.Handle("/", http.FileServer(http.Dir("dist")))
 
 	log.Fatal(http.ListenAndServe(":80", nil))
+}
+
+func setupWebAPI(effectList *[]Effect, colorPaletteList *[]ColorPalette, connectedMCUs *[]*nodeMCU.ConnectedNode, onApplyConfig func(request SetConfigRequest)) {
+	http.HandleFunc("/setConfig", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+		w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+
+		if r.Method == "OPTIONS" {
+			return
+		}
+
+		decoder := json.NewDecoder(r.Body)
+		var config SetConfigRequest
+		err := decoder.Decode(&config)
+		if err != nil {
+			w.WriteHeader(500)
+		} else {
+			onApplyConfig(config)
+		}
+	})
+
+	http.HandleFunc("/getEffectList", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Content-Type", "application/json")
+		err := json.NewEncoder(w).Encode(*effectList)
+		if err != nil {
+			log.Fatal(err)
+		}
+	})
+
+	http.HandleFunc("/getColorPaletteList", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Content-Type", "application/json")
+		err := json.NewEncoder(w).Encode(*colorPaletteList)
+		if err != nil {
+			log.Fatal(err)
+		}
+	})
+
+	http.HandleFunc("/getConnectedNodeMCUs", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Content-Type", "application/json")
+		err := json.NewEncoder(w).Encode(*connectedMCUs)
+		if err != nil {
+			log.Fatal(err)
+		}
+	})
 }
 
 func setupNodeAPI(effectDataGetter func(nodeID string) []byte, onNodeRegisterRequest func(request RegistrationRequest, ip string)) {
@@ -88,45 +146,6 @@ func setupNodeAPI(effectDataGetter func(nodeID string) []byte, onNodeRegisterReq
 			if err != nil {
 				log.Printf("error on sending effect file %v", err)
 			}
-		}
-	})
-}
-
-func setupWebAPI(effectList *[]Effect, connectedMCUs *[]*nodeMCU.ConnectedNode, onApplyConfig func(request SetConfigRequest)) {
-	http.HandleFunc("/setConfig", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
-		w.Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
-
-		if r.Method == "OPTIONS" {
-			return
-		}
-
-		decoder := json.NewDecoder(r.Body)
-		var config SetConfigRequest
-		err := decoder.Decode(&config)
-		if err != nil {
-			w.WriteHeader(500)
-		} else {
-			onApplyConfig(config)
-		}
-	})
-
-	http.HandleFunc("/getEffectList", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Content-Type", "application/json")
-		err := json.NewEncoder(w).Encode(*effectList)
-		if err != nil {
-			log.Fatal(err)
-		}
-	})
-
-	http.HandleFunc("/getConnectedNodeMCUs", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Content-Type", "application/json")
-		err := json.NewEncoder(w).Encode(*connectedMCUs)
-		if err != nil {
-			log.Fatal(err)
 		}
 	})
 }

@@ -4689,6 +4689,11 @@ react-is@^16.7.0, react-is@^16.8.0, react-is@^16.8.1:
   resolved "https://registry.yarnpkg.com/react-is/-/react-is-16.13.1.tgz#789729a4dc36de2999dc156dd6c1d9c18cea56a4"
   integrity sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==
 
+react-multicolor-circular-progress-bar@^1.0.0:
+  version "1.0.3"
+  resolved "https://registry.yarnpkg.com/react-multicolor-circular-progress-bar/-/react-multicolor-circular-progress-bar-1.0.3.tgz#155180b345dc8cfc13475e0903fdb4fcce936f9e"
+  integrity sha512-v4TkfprihkrXdBOJGVhd2bZcC5wrCjs3AXKAtCYhnItFT0uG6E1C1QnU+yaQ8PX93knb95SrZeqr34QKEQOyAw==
+
 react-transition-group@^4.4.0:
   version "4.4.1"
   resolved "https://registry.yarnpkg.com/react-transition-group/-/react-transition-group-4.4.1.tgz#63868f9325a38ea5ee9535d828327f85773345c9"
@@ -4699,7 +4704,7 @@ react-transition-group@^4.4.0:
     loose-envify "^1.4.0"
     prop-types "^15.6.2"
 
-react@^16.8.0:
+react@^16.0.0:
   version "16.13.1"
   resolved "https://registry.yarnpkg.com/react/-/react-16.13.1.tgz#2e818822f1a9743122c063d6410d85c1e3afe48e"
   integrity sha512-YMZQQq32xHLX0bz5Mnibv1/LHb3Sqzngu7xstSM+vrkE5Kzr9xE0yMByK5kMoTK30YVJE61WfbxIFFvfeDKT1w==

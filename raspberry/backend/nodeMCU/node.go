@@ -3,6 +3,7 @@ package nodeMCU
 import (
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -43,6 +44,14 @@ func (n *ConnectedNode) StartEffect() error {
 	return err
 }
 
+func (n *ConnectedNode) Restart() error {
+	req, err := http.NewRequest("POST", "http://"+n.IP+"/restart", nil)
+	if err == nil {
+		return sendRequest(req)
+	}
+	return err
+}
+
 func (n *ConnectedNode) PowerOff() error {
 	req, err := http.NewRequest("POST", "http://"+n.IP+"/off", nil)
 	if err == nil {
@@ -51,8 +60,8 @@ func (n *ConnectedNode) PowerOff() error {
 	return err
 }
 
-func (n *ConnectedNode) PowerOn() error {
-	req, err := http.NewRequest("POST", "http://"+n.IP+"/on", nil)
+func (n *ConnectedNode) PowerOn(brightness int) error {
+	req, err := http.NewRequest("POST", "http://"+n.IP+"/on?brightness="+strconv.Itoa(brightness), nil)
 	if err == nil {
 		return sendRequest(req)
 	}

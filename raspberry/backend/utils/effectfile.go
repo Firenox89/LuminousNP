@@ -5,7 +5,8 @@ import (
 	"encoding/binary"
 	"github.com/lucasb-eyer/go-colorful"
 	"log"
-	"math/rand"
+	"math"
+	"strings"
 )
 
 const defaultDelay = 50
@@ -19,6 +20,8 @@ type EffectFormatHeader struct {
 }
 
 var (
+	colorValueRamp = []string{"00", "22", "44", "66", "88", "AA", "CC", "FF"}
+
 	repeatFlag        int32 = 1 << 0
 	shiftCircularFlag int32 = 1 << 1
 	interpolateFlag   int32 = 1 << 2
@@ -47,121 +50,27 @@ func generateEffectHeader(frameCount int, delay int16, bytesPerLed int, ledCount
 	return buf.Bytes()
 }
 
-func min(r uint8, g uint8, b uint8) uint8 {
-	x := r
-	if x > g {
-		x = g
-	}
-	if x > b {
-		x = b
-	}
-	return x
+func ApplyBrightnessToColorHex(color string, brightness int) string {
+	var c, _ = colorful.Hex(color)
+	h, s, v := c.Hsv()
+	newV := math.Min(float64(brightness) / 100, v)
+	return strings.TrimPrefix(colorful.Hsv(h, s, newV).Hex(), "#")
 }
 
-func GenerateColorFadeEffect(bytesPerLed int, ledCount int, hexColor string) ([]byte, error) {
-	var steps = 32
-	frameCount := steps * 2
-	var values = generateEffectHeader(frameCount, defaultDelay*3, bytesPerLed, ledCount, true, false, true)
+func GenerateFadeFromPalette(bytesPerLed int, ledCount int, palette []string, brightness int) []byte {
+	var steps = 100
+	var values = generateEffectHeader(steps, 500, bytesPerLed, ledCount, true, false, true)
 
-	var c, err = colorful.Hex("#" + hexColor)
-
-	if err != nil {
-		return nil, err
-	}
-	var inc = 0.8 / float64(steps)
-
-	var h, s, v = c.Hsv()
-	s = 1
-	v = 0.2
-
+	stepSize := float64(len(palette)) / float64(ledCount)
 	for j := 0; j < steps; j++ {
-		r, g, b := colorful.Hsv(h, s, v).RGB255()
-		w := min(r, g, b)
-		for i := 0; i < ledCount; i++ {
-			values = append(values, g)
-			values = append(values, r)
-			values = append(values, b)
-			values = append(values, w)
+		color, err := colorful.Hex("#"+ApplyBrightnessToColorHex(palette[int(float64(j)*stepSize)], brightness))
+		if err != nil {
+			panic(err.Error())
 		}
-		v += inc
-	}
-	for j := 0; j < steps; j++ {
-		r, g, b := colorful.Hsv(h, s, v).RGB255()
-		w := min(r, g, b)
+		r, g, b := color.RGB255()
 		for i := 0; i < ledCount; i++ {
-			values = append(values, g)
 			values = append(values, r)
-			values = append(values, b)
-			values = append(values, w)
-		}
-		v -= inc
-	}
-	return values, nil
-}
-
-func GenerateRainbowFade(bytesPerLed int, ledCount int) []byte {
-	var steps = 200
-	var values = generateEffectHeader(steps, defaultDelay, bytesPerLed, ledCount, true, false, false)
-
-	var inc = 360.0 / float64(steps)
-	var hue = rand.Float64() * 360
-	for j := 0; j < steps; j++ {
-		r, g, b := colorful.Hsv(hue, 1, 1).RGB255()
-		for i := 0; i < ledCount; i++ {
 			values = append(values, g)
-			values = append(values, r)
-			values = append(values, b)
-			values = append(values, 0)
-		}
-		hue += inc
-		if hue > 360 {
-			hue = 0
-		}
-	}
-	return values
-}
-
-func GenerateInterpolateTest(bytesPerLed int, ledCount int) []byte {
-	var frames = 4
-	var values = generateEffectHeader(frames, 1500, bytesPerLed, ledCount, true, false, true)
-
-	for i := 0; i < ledCount; i++ {
-		values = append(values, 255)
-		values = append(values, 0)
-		values = append(values, 0)
-		values = append(values, 0)
-	}
-	for i := 0; i < ledCount; i++ {
-		values = append(values, 0)
-		values = append(values, 255)
-		values = append(values, 0)
-		values = append(values, 0)
-	}
-	for i := 0; i < ledCount; i++ {
-		values = append(values, 0)
-		values = append(values, 0)
-		values = append(values, 255)
-		values = append(values, 0)
-	}
-	for i := 0; i < ledCount; i++ {
-		values = append(values, 0)
-		values = append(values, 0)
-		values = append(values, 0)
-		values = append(values, 255)
-	}
-	return values
-}
-
-func GenerateWarmColorFade(bytesPerLed int, ledCount int) []byte {
-	var steps = 20
-	var values = generateEffectHeader(steps, 1000, bytesPerLed, ledCount, true, false, true)
-
-	colors := colorful.FastWarmPalette(steps)
-	for j := 0; j < steps; j++ {
-		r, g, b := colors[j].RGB255()
-		for i := 0; i < ledCount; i++ {
-			values = append(values, g)
-			values = append(values, r)
 			values = append(values, b)
 			values = append(values, 0)
 		}
@@ -169,18 +78,31 @@ func GenerateWarmColorFade(bytesPerLed int, ledCount int) []byte {
 	return values
 }
 
-func GenerateRunningRainbow(bytesPerLed int, ledCount int) []byte {
+func GenerateRotationFromPalette(bytesPerLed int, ledCount int, palette []string, brightness int) []byte {
 	var values = generateEffectHeader(1, defaultDelay, bytesPerLed, ledCount, true, true, false)
 
-	hueStepSize := 360.0 / float64(ledCount)
-	var hue = rand.Float64() * 360
+	stepSize := float64(len(palette)) / float64(ledCount)
 	for i := 0; i < ledCount; i++ {
-		r, g, b := colorful.Hsv(hue, 1, 1).RGB255()
-		values = append(values, g)
+		color, err := colorful.Hex("#"+ApplyBrightnessToColorHex(palette[int(float64(i)*stepSize)], brightness))
+		if err != nil {
+			panic(err.Error())
+		}
+		r, g, b := color.RGB255()
 		values = append(values, r)
+		values = append(values, g)
 		values = append(values, b)
 		values = append(values, 0)
-		hue += hueStepSize
+	}
+	return values
+}
+
+func BuildRainbowPalette() []string {
+	var hue = 0.0
+	var values []string
+	for j := 0; j < 360; j++ {
+		hex := colorful.Hsv(hue, 1, 1).Hex()
+		values = append(values, hex)
+		hue += 1
 		if hue > 360 {
 			hue = 0
 		}
@@ -188,33 +110,80 @@ func GenerateRunningRainbow(bytesPerLed int, ledCount int) []byte {
 	return values
 }
 
-func GenerateRunningWarmColors(bytesPerLed int, ledCount int) ([]byte, error) {
-	var values = generateEffectHeader(1, defaultDelay, bytesPerLed, ledCount, true, true, false)
+func BuildHappyPalette() []string {
+	colors := colorful.FastHappyPalette(100)
 
-	colors := colorful.FastWarmPalette(ledCount/3 + 1)
-
-	for i := 0; i < ledCount; i++ {
-		r, g, b := colors[i/3].RGB255()
-		w := min(r, g, b)
-		values = append(values, g)
-		values = append(values, r)
-		values = append(values, b)
-		values = append(values, w)
+	var values []string
+	for j := 0; j < 100; j++ {
+		hex := colors[j].Hex()
+		values = append(values, hex)
 	}
-	return values, nil
+	return values
 }
 
-func GenerateRunningHappyColors(bytesPerLed int, ledCount int) ([]byte, error) {
-	var values = generateEffectHeader(1, defaultDelay, bytesPerLed, ledCount, true, true, false)
-
-	colors := colorful.FastHappyPalette(ledCount/3 + 1)
-
-	for i := 0; i < ledCount; i++ {
-		r, g, b := colors[i/3].RGB255()
-		values = append(values, g)
-		values = append(values, r)
-		values = append(values, b)
-		values = append(values, 0)
+func BuildRedToGreenRamp() []string {
+	var result []string
+	for i := 0; i < len(colorValueRamp); i++ {
+		result = append(result, "#FF"+colorValueRamp[i]+"00")
 	}
-	return values, nil
+	return result
+}
+
+func BuildRedToBlueRamp() []string {
+	var result []string
+	for i := 0; i < len(colorValueRamp); i++ {
+		result = append(result, "#FF00"+colorValueRamp[i])
+	}
+	return result
+}
+
+func BuildBlueToGreenRamp() []string {
+	var result []string
+	for i := 0; i < len(colorValueRamp); i++ {
+		result = append(result, "#00"+colorValueRamp[i]+"FF")
+	}
+	return result
+}
+
+func BuildBlueToRedRamp() []string {
+	var result []string
+	for i := 0; i < len(colorValueRamp); i++ {
+		result = append(result, "#"+colorValueRamp[i]+"00FF")
+	}
+	return result
+}
+
+func BuildGreenToRedRamp() []string {
+	var result []string
+	for i := 0; i < len(colorValueRamp); i++ {
+		result = append(result, "#"+colorValueRamp[i]+"FF00")
+	}
+	return result
+}
+
+func BuildGreenToBlueRamp() []string {
+	var result []string
+	for i := 0; i < len(colorValueRamp); i++ {
+		result = append(result, "#00FF"+colorValueRamp[i])
+	}
+	return result
+}
+
+func OddlyInsertBlack(colors []string) []string {
+	var result []string
+	for i := 0; i < len(colors); i++ {
+		result = append(result, colors[i], "#000000")
+	}
+	return result
+}
+
+func RevertLoop(colors []string) []string {
+	var result []string
+	for i := 0; i < len(colors); i++ {
+		result = append(result, colors[i])
+	}
+	for i := len(colors)-1; i > 1; i-- {
+		result = append(result, colors[i-1])
+	}
+	return result
 }

@@ -1,18 +1,16 @@
 import Typography from "@material-ui/core/Typography";
-import FormControlLabel from "@material-ui/core/FormControlLabel";
-import Checkbox from "@material-ui/core/Checkbox";
-import FormControl from "@material-ui/core/FormControl";
-import InputLabel from "@material-ui/core/InputLabel";
-import Select from "@material-ui/core/Select";
-import MenuItem from "@material-ui/core/MenuItem";
-import {SliderPicker} from "react-color";
+import {HuePicker} from "react-color";
 import * as PropTypes from "prop-types";
 import React from "react";
 import Paper from "@material-ui/core/Paper";
 import {Button} from "@material-ui/core";
+import Grid from "@material-ui/core/Grid";
+import Slider from "@material-ui/core/Slider";
+import {ColorPaletteButton} from "./ColorPaletteButton";
 
 export function LEDConfig(props) {
     const [effectList, setEffectList] = React.useState();
+    const [colorPaletteList, setColorPaletteList] = React.useState();
 
     if (!effectList) {
         fetch("/getEffectList")
@@ -21,12 +19,33 @@ export function LEDConfig(props) {
                 setEffectList(data)
             })
     }
+    if (!colorPaletteList) {
+        fetch("/getColorPaletteList")
+            .then(response => response.json())
+            .then(data => {
+                setColorPaletteList(data)
+            })
+    }
 
-    const buildEffectMenuItems = () => {
+    const buildEffectTiles = () => {
         if (effectList) {
             return effectList.map(value => {
                 return (
-                    <MenuItem key={value.ID} value={value.ID}>{value.Name}</MenuItem>
+                    <Button key={value.ID} variant="contained" className={props.classes.button}
+                            onClick={() => props.onEffectChange(value.ID)}>{value.Name}</Button>
+                )
+            })
+        }
+    }
+
+    const buildColorPaletteTiles = () => {
+        if (colorPaletteList) {
+            return colorPaletteList.map(value => {
+                return (
+                    <ColorPaletteButton key={value.ID} classes={props.classes}
+                                        onClick={() => props.onColorPaletteChange(value.ID)}
+                                        colors={value.Colors}
+                    />
                 )
             })
         }
@@ -42,60 +61,38 @@ export function LEDConfig(props) {
         return false
     }
 
+    const needsColorPalette = () => {
+        if (effectList) {
+            const effect = effectList.find(value => value.ID === props.selectedEffect)
+            if (effect) {
+                return effect.NeedsColorPalette
+            }
+        }
+        return false
+    }
+
     return <Paper className={props.classes.paper}>
         <Typography className={props.classes.title} gutterBottom>
-            Config
+            Preset
         </Typography>
-        <Typography className={props.classes.subtitle} gutterBottom>
-            LEDs
-        </Typography>
-        <FormControlLabel
-            control={
-                <Checkbox
-                    checked={props.power}
-                    onChange={(props.setPower)}
-                    value="checkedB"
-                    color="primary"
-                />
+        <Grid container spacing={1}>
+            <Grid item xs={12} sm={12}>
+                <Button variant="contained" className={props.classes.button} onClick={props.onOff}>Off</Button>
+                {buildEffectTiles()}
+            </Grid>
+            {needsColorPalette() &&
+            <Grid item xs={12} sm={12}>
+                {buildColorPaletteTiles()}
+            </Grid>
             }
-            label="Power"
-        />
-        <FormControlLabel
-            control={
-                <Checkbox
-                    checked={props.useWhite}
-                    onChange={(props.setUseWhite)}
-                    value="checkedB"
-                    color="primary"
-                />
-            }
-            label="Use white LED"
-        />
-        <Typography className={props.classes.subtitle} gutterBottom>
-            Effect
-        </Typography>
-        <FormControl variant="outlined" className={props.classes.formControl}>
-            <Select
-                id="demo-simple-select-outlined"
-                value={props.selectedEffect}
-                onChange={(props.onEffectChange)}
-            >
-                {buildEffectMenuItems()}
-            </Select>
-        </FormControl>
-        <Button variant="contained" className={props.classes.button} onClick={props.onApply}>Apply</Button>
-        {/*<HuePicker*/}
-        {/*    color={props.color}*/}
-        {/*    onChange={props.onColorChange}*/}
-        {/*    onChangeComplete={props.onChange}*/}
-        {/*/>*/}
+        </Grid>
         {needsColor() &&
         <div>
             <Typography className={props.classes.subtitle} gutterBottom>
                 Color
             </Typography>
             <div style={{margin: 16}}>
-                <SliderPicker
+                <HuePicker
                     color={props.color}
                     onChange={props.onColorChange}
                     onChangeComplete={props.onChange}
@@ -103,6 +100,12 @@ export function LEDConfig(props) {
             </div>
         </div>
         }
+        <Typography className={props.classes.title} gutterBottom>
+            Brightness
+        </Typography>
+        <div style={{margin: 16}}>
+            <Slider value={props.brightness} onChange={(event, newValue) => props.onChangeBrightness(newValue)}/>
+        </div>
     </Paper>;
 }
 
@@ -115,5 +118,7 @@ LEDConfig.propTypes = {
     value: PropTypes.number,
     prop6: PropTypes.func,
     color: PropTypes.string,
-    onChange: PropTypes.func
+    onChange: PropTypes.func,
+    brightness: PropTypes.number,
+    onChangeBrightness: PropTypes.func
 };
