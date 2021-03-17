@@ -1,39 +1,42 @@
 package nodeMCU
 
 import (
+	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"strconv"
-	"time"
+)
+
+type ShowCaseType int
+
+const (
+	ShowcaseType1 ShowCaseType = 1 << iota
+	ShowcaseType2
 )
 
 type ConnectedNode struct {
-	IP                 string
-	ID                 string
-	LedCount           int
-	BytesPerLED        int
-	Segments           []int
-	IsConnected        *bool
-	HeartbeatTimestamp int64 `json:"-"`
+	IP       string
+	ID       string
+	Type     ShowCaseType
+	Effects  []string
+	Palettes []string
 }
 
 func NewConnectionNode(
 	IP string,
 	ID string,
-	LedCount int,
-	BytesPerLED int,
-	Segments []int) *ConnectedNode {
-	node := &ConnectedNode{
-		IP:                 IP,
-		ID:                 ID,
-		LedCount:           LedCount,
-		BytesPerLED:        BytesPerLED,
-		Segments:           Segments,
-		IsConnected:        new(bool),
-		HeartbeatTimestamp: time.Now().Unix(),
+	Type ShowCaseType,
+	Effects []string,
+	Palettes []string,
+) *ConnectedNode {
+	return &ConnectedNode{
+		IP:       IP,
+		ID:       ID,
+		Type:     Type,
+		Effects:  Effects,
+		Palettes: Palettes,
 	}
-	*node.IsConnected = true
-	return node
 }
 
 func (n *ConnectedNode) StartEffect() error {
@@ -85,5 +88,27 @@ func sendRequest(req *http.Request) error {
 		log.Printf("Request status code " + resp.Status)
 	}
 
+	return err
+}
+
+func (n *ConnectedNode) SendWARLSDatagram(data []byte) error {
+	addr := &net.UDPAddr{
+		Port: 0,
+		IP:   net.ParseIP("0.0.0.0"),
+	}
+	ser, err := net.ListenUDP("udp", addr)
+	if err != nil {
+		fmt.Printf("Listen error %v\n", err)
+		return err
+	}
+	targetAddr, err := net.ResolveUDPAddr("udp", n.IP+":21324")
+	if err != nil {
+		fmt.Printf("Resolve error %v\n", err)
+		return err
+	}
+	_, err = ser.WriteToUDP(data, targetAddr)
+	if err != nil {
+		fmt.Printf("Send error %v\n", err)
+	}
 	return err
 }

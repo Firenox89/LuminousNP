@@ -7,6 +7,7 @@ import (
 	"log"
 	"math"
 	"strings"
+	"time"
 )
 
 const defaultDelay = 50
@@ -53,7 +54,7 @@ func generateEffectHeader(frameCount int, delay int16, bytesPerLed int, ledCount
 func ApplyBrightnessToColorHex(color string, brightness int) string {
 	var c, _ = colorful.Hex(color)
 	h, s, v := c.Hsv()
-	newV := math.Min(float64(brightness) / 100, v)
+	newV := math.Min(float64(brightness)/100, v)
 	return strings.TrimPrefix(colorful.Hsv(h, s, newV).Hex(), "#")
 }
 
@@ -63,7 +64,7 @@ func GenerateFadeFromPalette(bytesPerLed int, ledCount int, palette []string, br
 
 	stepSize := float64(len(palette)) / float64(ledCount)
 	for j := 0; j < steps; j++ {
-		color, err := colorful.Hex("#"+ApplyBrightnessToColorHex(palette[int(float64(j)*stepSize)], brightness))
+		color, err := colorful.Hex("#" + ApplyBrightnessToColorHex(palette[int(float64(j)*stepSize)], brightness))
 		if err != nil {
 			panic(err.Error())
 		}
@@ -83,7 +84,7 @@ func GenerateRotationFromPalette(bytesPerLed int, ledCount int, palette []string
 
 	stepSize := float64(len(palette)) / float64(ledCount)
 	for i := 0; i < ledCount; i++ {
-		color, err := colorful.Hex("#"+ApplyBrightnessToColorHex(palette[int(float64(i)*stepSize)], brightness))
+		color, err := colorful.Hex("#" + ApplyBrightnessToColorHex(palette[int(float64(i)*stepSize)], brightness))
 		if err != nil {
 			panic(err.Error())
 		}
@@ -182,8 +183,76 @@ func RevertLoop(colors []string) []string {
 	for i := 0; i < len(colors); i++ {
 		result = append(result, colors[i])
 	}
-	for i := len(colors)-1; i > 1; i-- {
+	for i := len(colors) - 1; i > 1; i-- {
 		result = append(result, colors[i-1])
 	}
 	return result
+}
+
+func StartZScanner(showcase NodeMappings, send func(data []byte, ip string) error) error {
+	var litLeds []int
+	println("Start Loop\n")
+	for true {
+
+		for i := 0; i < showcase.CountZ; i++ {
+			var data = generateWARLSHeader()
+			//turn off the leds from last step
+			for _, lit := range litLeds {
+				data = append(data, byte(lit), 0, 0, 0)
+			}
+			litLeds = showcase.NodesZ[i]
+
+			for _, lit := range litLeds {
+				data = append(data, byte(lit), 255, 0, 0)
+			}
+			err := send(data, "192.168.178.61")
+			if err != nil {
+				return err
+			}
+			time.Sleep(time.Millisecond * 100)
+		}
+
+		for i := 0; i < showcase.CountX; i++ {
+			var data = generateWARLSHeader()
+			//turn off the leds from last step
+			for _, lit := range litLeds {
+				data = append(data, byte(lit), 0, 0, 0)
+			}
+			litLeds = showcase.NodesX[i]
+
+			for _, lit := range litLeds {
+				data = append(data, byte(lit), 255, 0, 0)
+			}
+			err := send(data, "192.168.178.61")
+			if err != nil {
+				return err
+			}
+			time.Sleep(time.Millisecond * 100)
+		}
+		for i := 0; i < showcase.CountY; i++ {
+			var data = generateWARLSHeader()
+			//turn off the leds from last step
+			for _, lit := range litLeds {
+				data = append(data, byte(lit), 0, 0, 0)
+			}
+			litLeds = showcase.NodesY[i]
+
+			for _, lit := range litLeds {
+				data = append(data, byte(lit), 255, 0, 0)
+			}
+			err := send(data, "192.168.178.61")
+			if err != nil {
+				return err
+			}
+			time.Sleep(time.Millisecond * 100)
+		}
+	}
+
+	return nil
+}
+
+func generateWARLSHeader() []byte {
+	//1 = protocol
+	//2 = time till web interfaces gets activated again
+	return []byte{1, 2}
 }

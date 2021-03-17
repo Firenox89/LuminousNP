@@ -1,51 +1,11 @@
 package main
 
 import (
-	"fmt"
 	"log"
-	"os/exec"
-	"sync"
 	"utils/nodeMCU"
 	"utils/utils"
 	"utils/web"
 )
-
-var (
-	effectStore      = make(map[string][]byte)
-	effectStoreMutex = sync.RWMutex{}
-)
-
-var effectList = []web.Effect{
-	{0, "Just White", false, false, func(node *nodeMCU.ConnectedNode, config web.LEDConfig) error {
-		return node.PowerOn(config.Brightness)
-	}},
-	{1, "Single Color", true, false, func(node *nodeMCU.ConnectedNode, config web.LEDConfig) error {
-		return node.ColorFill(utils.ApplyBrightnessToColorHex(config.Color, config.Brightness))
-	}},
-	{2, "Fade", false, true, func(node *nodeMCU.ConnectedNode, config web.LEDConfig) error {
-		effectData := utils.GenerateFadeFromPalette(node.BytesPerLED, node.LedCount, colorPaletteList[config.ColorPaletteId].Colors, config.Brightness)
-		effectStoreMutex.Lock()
-		effectStore[node.ID] = effectData
-		effectStoreMutex.Unlock()
-		return node.StartEffect()
-	}},
-	{3, "Rotation", false, true, func(node *nodeMCU.ConnectedNode, config web.LEDConfig) error {
-		effectData := utils.GenerateRotationFromPalette(node.BytesPerLED, node.LedCount, colorPaletteList[config.ColorPaletteId].Colors, config.Brightness)
-		effectStoreMutex.Lock()
-		effectStore[node.ID] = effectData
-		effectStoreMutex.Unlock()
-		return node.StartEffect()
-	}},
-	{4, "Restart Node", false, false, func(node *nodeMCU.ConnectedNode, config web.LEDConfig) error {
-		return node.Restart()
-	}},
-	{5, "Restart Pi", false, false, func(node *nodeMCU.ConnectedNode, config web.LEDConfig) error {
-		if err := exec.Command("sudo", "reboot").Run(); err != nil {
-			fmt.Println("Failed to initiate shutdown:", err)
-		}
-		return nil
-	}},
-}
 
 var colorPaletteList = []web.ColorPalette{
 	{0, utils.OddlyInsertBlack(utils.BuildRedToGreenRamp())},
@@ -70,23 +30,12 @@ func main() {
 	nodeMCUController := nodeMCU.NewController()
 
 	web.ServeWeb(
-		&effectList,
+		&[]web.Effect{},
 		&colorPaletteList,
-		&nodeMCUController.ConnectedMCUs,
+		nodeMCUController,
 		func(request web.SetConfigRequest) {
 			processNodesConfig(request, nodeMCUController)
-		},
-		func(request web.RegistrationRequest, ip string) {
-			nodeMCUController.RegisterNode(ip, request.ID, request.LedCount, request.BytesPerLED, request.Segments)
-		},
-		func(effectId string) []byte {
-			effectStoreMutex.RLock()
-			data := effectStore[effectId]
-			effectStoreMutex.RUnlock()
-			return data
 		})
-
-	//startUDPServer()
 }
 
 func processNodesConfig(request web.SetConfigRequest, controller *nodeMCU.Controller) {
@@ -112,7 +61,7 @@ func sendConfig(request web.SetConfigRequest, node *nodeMCU.ConnectedNode) {
 	if !request.Config.Power {
 		err = node.PowerOff()
 	} else {
-		err = effectList[request.Config.Effect].Handler(node, request.Config)
+		//err = effectList[request.Config.Effect].Handler(node, request.Config)
 	}
 	if err != nil {
 		log.Printf("Failed set node %s, err %v", node.ID, err)

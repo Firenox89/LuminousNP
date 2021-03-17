@@ -17,6 +17,14 @@ function setupWebServer()
         res:send(200)
     end)
 
+    httpServer:use('/bar', function(req, res)
+        res:send(200)
+    end)
+
+    httpServer:use('/baro', function(req, res)
+        res:send(dump(readBarometer()))
+    end)
+
     httpServer:use('/restart', function(req, res)
         LEDs.off(0)
         node.task.post(function()
@@ -225,6 +233,37 @@ function openUDPSocket()
     end)
 end
 
+busId = 0
+sdaGPIO = 4
+sclGPIO = 0
+
+i2c.setup(busId, sdaGPIO, sclGPIO, i2c.FAST)
+
+function readBarometer()
+    deviceId = 59
+    startRegister = 247 --0xF7
+    readLength = 7
+
+    i2c.start(busId)
+    i2c.address(busId, deviceId, i2c.TRANSMITTER)
+    i2c.write(busId, startRegister)
+    i2c.stop(busId)
+
+    i2c.start(busId)
+    i2c.address(busId, deviceId, i2c.RECEIVER)
+    local data = i2c.read(busId, readLength)
+    i2c.stop(busId)
+
+    local press_msb = string.byte(data, 0)
+    local press_lsb = string.byte(data, 1)
+    local press_xlsb = string.byte(data, 2)
+
+    local temp_msb = string.byte(data, 0)
+    local temp_lsb = string.byte(data, 1)
+    local temp_xlsb = string.byte(data, 2)
+    printDump(c)
+end
+
 if file.exists("OTA.update") then
     print("OTA file exists")
     file.remove("OTA.update")
@@ -234,7 +273,7 @@ if file.exists("OTA.update") then
         collectgarbage()
         -- run as separate task to maximise RAM available
         node.task.post(function()
-            node.flashreload("lfs.img")
+            node.LFS.reload("lfs.img")
         end)
     end)
 else
