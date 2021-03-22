@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:frontend/nodemodel.dart';
-import 'package:frontend/wled-api.dart';
-import 'package:http/http.dart' as http;
-import 'dart:html';
-import 'dart:convert';
+import 'package:frontend/overview.dart';
+import 'package:frontend/roomeffects.dart';
+import 'package:frontend/settings.dart';
 
 void main() {
   runApp(MyApp());
@@ -28,66 +26,79 @@ class MyHomePage extends StatefulWidget {
   _MyHomePageState createState() => _MyHomePageState();
 }
 
+enum Navigation { Overview, RoomEffects, Settings }
+
 class _MyHomePageState extends State<MyHomePage> {
-  List<ConnectedMCUs> nodes = [];
-  List<String> effects = [];
-  List<String> palettes = [];
-
-  _MyHomePageState() {
-    _loadNodes();
-  }
-
-  Future<void> _loadNodes() async {
-    String _ref = window.location.href;
-    String data;
-    try {
-      data = await http.read(Uri.http(_ref, "getConnectedNodeMCUs"));
-    } catch (error) {
-      data =
-          await http.read(Uri.http("localhost:1234", "getConnectedNodeMCUs"));
-    }
-
-    var json = NodeModel.fromJson(jsonDecode(data));
-    nodes = json.connectedMCUs;
-    effects = nodes.first.effects;
-    palettes = nodes.first.palettes;
-
-    setState((){});
-  }
+  Navigation currentNavigationItem = Navigation.Overview;
 
   @override
   Widget build(BuildContext context) {
+    double deviceWidth = MediaQuery.of(context).size.width;
+    double deviceHeight = MediaQuery.of(context).size.height;
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            ElevatedButton(onPressed: _loadNodes, child: Text("Refresh")),
+        body: Row(
+          children: [
             Container(
-                padding: EdgeInsets.only(top: 25),
-                height: 500,
-                width: 250,
-                child: ListView.builder(
-                    itemCount: nodes.length,
-                    itemBuilder: (BuildContext context, int index) {
-                      return buildNodeRow(nodes[index]);
-                    })),
+                width: 90,
+                height: deviceHeight,
+                decoration: BoxDecoration(
+                    border: Border(right: BorderSide(color: Colors.white))),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: _buildNavigation(),
+                )),
+            Container(
+              width: deviceWidth - 90,
+              height: deviceHeight,
+              child: _buildNavContent(),
+            ),
           ],
-        ),
-      ),
-    );
+        ));
   }
 
-  Widget buildNodeRow(ConnectedMCUs node) {
-    return Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-      Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Text(node.iD),
-      ),
-      ElevatedButton(onPressed: () {toggleOnOff(node);}, child: Text("On"))
-    ], );
+  _navigateTo(Navigation nav) {
+    setState(() {
+      currentNavigationItem = nav;
+    });
+  }
+
+  Widget _buildNavButton(String name, Navigation navItem) => ElevatedButton(
+      onPressed: () {
+        _navigateTo(navItem);
+      },
+      child: Container(
+          width: 64,
+          height: 64,
+          child: Center(
+            child: Text(name),
+          )));
+
+  List<Widget> _buildNavigation() {
+    return [
+      _buildNavButton("Overview", Navigation.Overview),
+      _buildNavButton("Room Effects", Navigation.RoomEffects),
+      _buildNavButton("Settings", Navigation.Settings),
+    ]
+        .map((e) => Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: e,
+            ))
+        .toList();
+  }
+
+  Widget _buildNavContent() {
+    switch (currentNavigationItem) {
+      case Navigation.Overview:
+        return OverviewPage();
+        break;
+      case Navigation.RoomEffects:
+        return RoomEffects();
+        break;
+      case Navigation.Settings:
+        return Settings();
+        break;
+    }
+    throw Exception("Boom");
   }
 }

@@ -30,7 +30,18 @@ var ShowcaseType1 = NodeMappings{
 	NodesZ:      buildNodesZType1(),
 }
 
+var ShowcaseType2 = NodeMappings{
+	CountX:      12,
+	CountY:      10,
+	CountZ:      44,
+	NodeIdCount: 200,
+	NodesX:      buildNodesXType2(),
+	NodesY:      buildNodesYType2(),
+	NodesZ:      buildNodesZType2(),
+}
+
 var levelOffsetType1 = 47
+var levelOffsetType2 = 40
 
 func appendRange(ids []int, start int, end int) []int {
 	for i := start; i < end; i++ {
@@ -102,17 +113,6 @@ func buildNodesZType1() map[int][]int {
 	return nodes
 }
 
-var ShowcaseType2 = NodeMappings{
-	CountX:      12,
-	CountY:      10,
-	CountZ:      44,
-	NodeIdCount: 200,
-	NodesX:      buildNodesXType2(),
-	NodesY:      buildNodesYType2(),
-	NodesZ:      buildNodesZType2(),
-}
-
-var levelOffsetType2 = 40
 
 func buildNodesXType2() map[int][]int {
 	var nodes = make(map[int][]int, 12)

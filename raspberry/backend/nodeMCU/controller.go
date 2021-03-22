@@ -27,6 +27,8 @@ func (c *Controller) RefreshNodes() {
 			getTypeFromLEDCount(node.Info.Leds.Count),
 			node.Effects,
 			node.Palettes,
+			node.State.Bri,
+			node.State.On,
 		)
 		nodes = append(nodes, newNode)
 	}

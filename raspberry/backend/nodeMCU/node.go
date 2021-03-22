@@ -16,11 +16,13 @@ const (
 )
 
 type ConnectedNode struct {
-	IP       string
-	ID       string
-	Type     ShowCaseType
-	Effects  []string
-	Palettes []string
+	IP         string
+	ID         string
+	Type       ShowCaseType
+	Effects    []string
+	Palettes   []string
+	Brightness int
+	On         bool
 }
 
 func NewConnectionNode(
@@ -29,13 +31,17 @@ func NewConnectionNode(
 	Type ShowCaseType,
 	Effects []string,
 	Palettes []string,
+	Brightness int,
+	On bool,
 ) *ConnectedNode {
 	return &ConnectedNode{
-		IP:       IP,
-		ID:       ID,
-		Type:     Type,
-		Effects:  Effects,
-		Palettes: Palettes,
+		IP:         IP,
+		ID:         ID,
+		Type:       Type,
+		Effects:    Effects,
+		Palettes:   Palettes,
+		Brightness: Brightness,
+		On:         On,
 	}
 }
 

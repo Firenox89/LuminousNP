@@ -109,7 +109,7 @@ func ScanNetwork() []WLEDNode {
 	for i := 1; i < 255; i++ {
 		go sendQuery(subNet, i, results)
 	}
-	time.Sleep(time.Second * 3)
+	time.Sleep(time.Second * 6)
 	var nodes []WLEDNode
 	for true {
 		select {
