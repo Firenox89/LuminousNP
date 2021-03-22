@@ -3,17 +3,14 @@ import 'dart:ui';
 import 'package:http/http.dart' as http;
 
 class NodeModel {
-  List<ConnectedMCUs> connectedMCUs;
+  List<ConnectedMCUs> connectedMCUs = [];
 
   NodeModel({this.connectedMCUs});
 
-  NodeModel.fromJson(Map<String, dynamic> json) {
-    if (json['ConnectedMCUs'] != null) {
-      connectedMCUs = new List<ConnectedMCUs>();
-      json['ConnectedMCUs'].forEach((v) {
-        connectedMCUs.add(new ConnectedMCUs.fromJson(v));
-      });
-    }
+  NodeModel.fromJson(List<dynamic> json) {
+    json.forEach((v) {
+      connectedMCUs.add(ConnectedMCUs.fromJson(v));
+    });
   }
 }
 
@@ -35,8 +32,6 @@ class ConnectedMCUs {
     palettes = json['Palettes'].cast<String>();
     brightness = json['Brightness'];
     on = json['On'];
-
-    print("init bri " + brightness.toString());
   }
 
   Future<bool> toggleOnOff(bool on) async {

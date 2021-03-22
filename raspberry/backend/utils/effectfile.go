@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"github.com/lucasb-eyer/go-colorful"
 	"log"
@@ -189,12 +190,15 @@ func RevertLoop(colors []string) []string {
 	return result
 }
 
-func StartZScanner(showcase NodeMappings, send func(data []byte, ip string) error) error {
+func StartScanner(ctx context.Context, palette []string, showcase NodeMappings, send func(data []byte) error) error {
 	var litLeds []int
-	println("Start Loop\n")
 	for true {
-
 		for i := 0; i < showcase.CountZ; i++ {
+			select {
+			case <-ctx.Done():
+				return nil
+			default:
+			}
 			var data = generateWARLSHeader()
 			//turn off the leds from last step
 			for _, lit := range litLeds {
@@ -205,7 +209,7 @@ func StartZScanner(showcase NodeMappings, send func(data []byte, ip string) erro
 			for _, lit := range litLeds {
 				data = append(data, byte(lit), 255, 0, 0)
 			}
-			err := send(data, "192.168.178.61")
+			err := send(data)
 			if err != nil {
 				return err
 			}
@@ -213,6 +217,11 @@ func StartZScanner(showcase NodeMappings, send func(data []byte, ip string) erro
 		}
 
 		for i := 0; i < showcase.CountX; i++ {
+			select {
+			case <-ctx.Done():
+				return nil
+			default:
+			}
 			var data = generateWARLSHeader()
 			//turn off the leds from last step
 			for _, lit := range litLeds {
@@ -223,13 +232,18 @@ func StartZScanner(showcase NodeMappings, send func(data []byte, ip string) erro
 			for _, lit := range litLeds {
 				data = append(data, byte(lit), 255, 0, 0)
 			}
-			err := send(data, "192.168.178.61")
+			err := send(data)
 			if err != nil {
 				return err
 			}
 			time.Sleep(time.Millisecond * 100)
 		}
 		for i := 0; i < showcase.CountY; i++ {
+			select {
+			case <-ctx.Done():
+				return nil
+			default:
+			}
 			var data = generateWARLSHeader()
 			//turn off the leds from last step
 			for _, lit := range litLeds {
@@ -240,7 +254,7 @@ func StartZScanner(showcase NodeMappings, send func(data []byte, ip string) erro
 			for _, lit := range litLeds {
 				data = append(data, byte(lit), 255, 0, 0)
 			}
-			err := send(data, "192.168.178.61")
+			err := send(data)
 			if err != nil {
 				return err
 			}

@@ -1,69 +1,72 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"log"
+	"net/http"
+	"strconv"
 	"utils/nodeMCU"
-	"utils/utils"
-	"utils/web"
 )
-
-var colorPaletteList = []web.ColorPalette{
-	{0, utils.OddlyInsertBlack(utils.BuildRedToGreenRamp())},
-	{1, utils.OddlyInsertBlack(utils.BuildRedToBlueRamp())},
-	{2, utils.OddlyInsertBlack(utils.BuildGreenToRedRamp())},
-	{3, utils.OddlyInsertBlack(utils.BuildGreenToBlueRamp())},
-	{4, utils.OddlyInsertBlack(utils.BuildBlueToRedRamp())},
-	{5, utils.OddlyInsertBlack(utils.BuildBlueToGreenRamp())},
-
-	{6, utils.RevertLoop(utils.BuildRedToGreenRamp())},
-	{7, utils.RevertLoop(utils.BuildRedToBlueRamp())},
-	{8, utils.RevertLoop(utils.BuildGreenToRedRamp())},
-	{9, utils.RevertLoop(utils.BuildGreenToBlueRamp())},
-	{10, utils.RevertLoop(utils.BuildBlueToRedRamp())},
-	{11, utils.RevertLoop(utils.BuildBlueToGreenRamp())},
-
-	{12, utils.BuildRainbowPalette()},
-	{13, utils.BuildHappyPalette()},
-}
 
 func main() {
 	nodeMCUController := nodeMCU.NewController()
 
-	web.ServeWeb(
-		&[]web.Effect{},
-		&colorPaletteList,
-		nodeMCUController,
-		func(request web.SetConfigRequest) {
-			processNodesConfig(request, nodeMCUController)
-		})
-}
+	log.Printf("Start Web Server")
 
-func processNodesConfig(request web.SetConfigRequest, controller *nodeMCU.Controller) {
-	log.Printf("Process config request...")
-	var nodes []*nodeMCU.ConnectedNode
-	for _, requestedNode := range request.Nodes {
-		log.Printf("Find node %s", requestedNode.ID)
-		node := controller.GetNodeForID(requestedNode.ID)
-		if node != nil {
-			nodes = append(nodes, node)
+	http.HandleFunc("/setEffect", func(w http.ResponseWriter, r *http.Request) {
+		id, err := strconv.Atoi(r.URL.Query().Get("id"))
+		if err == nil {
+			nodeMCUController.SetEffectId(id)
 		} else {
-			log.Printf("warning: no node found for %s", requestedNode.ID)
+			fmt.Printf("unable to parse effect id %s\n", r.URL.Query().Get("id"))
 		}
-	}
-	log.Printf("Config: Power %v, Color %s, Effect %d, palette %d", request.Config.Power, request.Config.Color, request.Config.Effect, request.Config.ColorPaletteId)
-	for _, node := range nodes {
-		go sendConfig(request, node)
-	}
-}
+	})
 
-func sendConfig(request web.SetConfigRequest, node *nodeMCU.ConnectedNode) {
-	var err error
-	if !request.Config.Power {
-		err = node.PowerOff()
-	} else {
-		//err = effectList[request.Config.Effect].Handler(node, request.Config)
-	}
+	http.HandleFunc("/setPalette", func(w http.ResponseWriter, r *http.Request) {
+		id, err := strconv.Atoi(r.URL.Query().Get("id"))
+		if err == nil {
+			nodeMCUController.SetPaletteId(id)
+		} else {
+			fmt.Printf("unable to parse palette id %s\n", r.URL.Query().Get("id"))
+		}
+	})
+
+	http.HandleFunc("/getEffectList", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Content-Type", "application/json")
+		err := json.NewEncoder(w).Encode(nodeMCUController.GetEffectNames())
+		if err != nil {
+			log.Fatal(err)
+		}
+	})
+
+	http.HandleFunc("/getColorPaletteList", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Content-Type", "application/json")
+		err := json.NewEncoder(w).Encode(nodeMCUController.GetPaletteNames())
+		if err != nil {
+			log.Fatal(err)
+		}
+	})
+
+	http.HandleFunc("/getConnectedNodeMCUs", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Content-Type", "application/json")
+		err := json.NewEncoder(w).Encode(nodeMCUController.ConnectedMCUs)
+		if err != nil {
+			log.Fatal(err)
+		}
+	})
+
+	http.HandleFunc("/stopEffects", func(w http.ResponseWriter, r *http.Request) {
+		nodeMCUController.StopEffects()
+	})
+	http.Handle("/", http.FileServer(http.Dir("dist")))
+
+	err := http.ListenAndServe(":80", nil)
 	if err != nil {
-		log.Printf("Failed set node %s, err %v", node.ID, err)
+		log.Printf("Could not use Port 80, try 1234. Reason: " + err.Error())
+		log.Fatal(http.ListenAndServe(":1234", nil))
 	}
 }

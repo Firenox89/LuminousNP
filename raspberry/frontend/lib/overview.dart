@@ -7,8 +7,6 @@ import 'dart:convert';
 import 'package:frontend/nodemodel.dart';
 import 'package:flex_color_picker/flex_color_picker.dart';
 
-import 'Nodes.dart';
-
 class OverviewPage extends StatefulWidget {
   @override
   _OverviewPageState createState() => _OverviewPageState();
@@ -27,7 +25,6 @@ class _OverviewPageState extends State<OverviewPage> {
 
   @override
   Widget build(BuildContext context) => Row(children: [
-        Nodes(),
         Container(
             decoration: BoxDecoration(
                 border: Border(right: BorderSide(color: Colors.white))),

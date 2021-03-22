@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"utils/utils"
 )
 
 type ShowCaseType int
@@ -14,6 +15,16 @@ const (
 	ShowcaseType1 ShowCaseType = 1 << iota
 	ShowcaseType2
 )
+
+func GetNodeMappingForType(caseType ShowCaseType) utils.NodeMappings {
+	switch caseType {
+	case ShowcaseType1:
+		return utils.ShowcaseType1
+	case ShowcaseType2:
+		return utils.ShowcaseType2
+	}
+	panic("Unknown type")
+}
 
 type ConnectedNode struct {
 	IP         string

@@ -13,7 +13,7 @@ import (
 )
 
 type WLEDNode struct {
-	IP string
+	IP    string
 	State struct {
 		On         bool `json:"on"`
 		Bri        int  `json:"bri"`

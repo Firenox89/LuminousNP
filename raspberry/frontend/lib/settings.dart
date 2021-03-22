@@ -7,5 +7,5 @@ class Settings extends StatefulWidget {
 
 class _SettingsPageState extends State<Settings> {
   @override
-  Widget build(BuildContext context) => Text("Nothing here yet");
+  Widget build(BuildContext context) => Text("No Settings here yet");
 }
