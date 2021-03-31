@@ -1,8 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:http/http.dart' as http;
-import 'dart:html';
+import 'package:frontend/api.dart';
 import 'dart:convert';
 import 'package:frontend/nodemodel.dart';
 import 'package:flex_color_picker/flex_color_picker.dart';
@@ -160,15 +159,8 @@ class _OverviewPageState extends State<OverviewPage> {
 
   Future<void> _loadNodes() async {
     print("load nodes");
-    String _ref = window.location.href;
-    String data;
-    try {
-      data = await http.read(Uri.http(_ref, "getConnectedNodeMCUs"));
-    } catch (error) {
-      data =
-          await http.read(Uri.http("localhost:1234", "getConnectedNodeMCUs"));
-    }
 
+    var data = await request("getConnectedNodeMCUs");
     var json = NodeModel.fromJson(jsonDecode(data));
     nodes = json.connectedMCUs;
     effects = nodes.first.effects;

@@ -2,6 +2,7 @@ package nodeMCU
 
 import (
 	"fmt"
+	"github.com/lucasb-eyer/go-colorful"
 	"log"
 	"net"
 	"net/http"
@@ -9,27 +10,10 @@ import (
 	"utils/utils"
 )
 
-type ShowCaseType int
-
-const (
-	ShowcaseType1 ShowCaseType = 1 << iota
-	ShowcaseType2
-)
-
-func GetNodeMappingForType(caseType ShowCaseType) utils.NodeMappings {
-	switch caseType {
-	case ShowcaseType1:
-		return utils.ShowcaseType1
-	case ShowcaseType2:
-		return utils.ShowcaseType2
-	}
-	panic("Unknown type")
-}
-
 type ConnectedNode struct {
 	IP         string
 	ID         string
-	Type       ShowCaseType
+	Type       utils.ShowCaseType
 	Effects    []string
 	Palettes   []string
 	Brightness int
@@ -39,7 +23,7 @@ type ConnectedNode struct {
 func NewConnectionNode(
 	IP string,
 	ID string,
-	Type ShowCaseType,
+	Type utils.ShowCaseType,
 	Effects []string,
 	Palettes []string,
 	Brightness int,
@@ -108,7 +92,7 @@ func sendRequest(req *http.Request) error {
 	return err
 }
 
-func (n *ConnectedNode) SendWARLSDatagram(data []byte) error {
+func (n *ConnectedNode) SendDatagram(data []byte) error {
 	addr := &net.UDPAddr{
 		Port: 0,
 		IP:   net.ParseIP("0.0.0.0"),
@@ -128,4 +112,34 @@ func (n *ConnectedNode) SendWARLSDatagram(data []byte) error {
 		fmt.Printf("Send error %v\n", err)
 	}
 	return err
+}
+
+func (n *ConnectedNode) mapColorStateAndSend(state utils.ColorState) {
+	nodeData := utils.MapColorStateToNodes(n.Type, state)
+	err := n.SendDatagram(generateDRGBPackage(nodeData))
+	if err != nil {
+		panic(err)
+	}
+}
+
+func generateWARLSPackage(nodeData []colorful.Color) []byte {
+	//1 = protocol
+	//2 = time till web interfaces gets activated again
+	data := []byte{1, 2}
+	for index, color := range nodeData{
+		r,g,b := color.RGB255()
+		data = append(data, byte(index), r, g, b)
+	}
+	return data
+}
+
+func generateDRGBPackage(nodeData []colorful.Color) []byte {
+	//2 = protocol
+	//2 = time till web interfaces gets activated again
+	data := []byte{2, 2}
+	for _, color := range nodeData{
+		r,g,b := color.RGB255()
+		data = append(data, r, g, b)
+	}
+	return data
 }

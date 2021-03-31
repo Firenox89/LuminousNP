@@ -2,8 +2,10 @@ package nodeMCU
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"strings"
+	"time"
 	"utils/utils"
 )
 
@@ -14,7 +16,12 @@ type ColorPalette struct {
 
 type Effect struct {
 	Name    string
-	handler func(ctx context.Context, palette ColorPalette, caseType ShowCaseType, send func(data []byte) error)
+	handler func(
+		ctx context.Context,
+		palette ColorPalette,
+		colorState utils.ColorState,
+		onChange func(),
+	)
 }
 
 var colorPaletteList = []ColorPalette{
@@ -40,11 +47,55 @@ var effects = []Effect{
 	{Name: "Scanner", handler: func(
 		ctx context.Context,
 		palette ColorPalette,
-		caseType ShowCaseType,
-		send func(data []byte) error,
+		colorState utils.ColorState,
+		onChange func(),
 	) {
-		utils.StartScanner(ctx, palette.Colors, GetNodeMappingForType(caseType), send)
+		utils.StartZScannerSynced(ctx, palette.Colors, colorState, onChange)
 	}},
+	{Name: "Rainbow", handler: func(
+		ctx context.Context,
+		palette ColorPalette,
+		colorState utils.ColorState,
+		onChange func(),
+	) {
+		utils.StartRainbowSynced(ctx, palette.Colors, colorState, onChange)
+	}},
+	{Name: "ZFlow", handler: func(
+		ctx context.Context,
+		palette ColorPalette,
+		colorState utils.ColorState,
+		onChange func(),
+	) {
+		utils.StartZFlowSynced(ctx, palette.Colors, colorState, onChange)
+	}},
+	{Name: "RainbowXFlow", handler: func(
+		ctx context.Context,
+		palette ColorPalette,
+		colorState utils.ColorState,
+		onChange func(),
+	) {
+		utils.StartRainbowXFlowSynced(ctx, palette.Colors, colorState, onChange)
+	}},
+	{Name: "RainbowYFlow", handler: func(
+		ctx context.Context,
+		palette ColorPalette,
+		colorState utils.ColorState,
+		onChange func(),
+	) {
+		utils.StartRainbowYFlowSynced(ctx, palette.Colors, colorState, onChange)
+	}},
+}
+
+func (c *Controller) getStateUpdater() (utils.ColorState, func()) {
+	stateSizeX, stateSizeY, stateSizeZ := utils.GetMaxXYZ()
+	colorState := utils.NewColorState(stateSizeX, stateSizeY, stateSizeZ)
+	onChange := func() {
+		c.updateCounter++
+		for _, node := range c.ConnectedMCUs {
+			go node.mapColorStateAndSend(colorState)
+		}
+	}
+	return colorState, onChange
 }
 
 type Controller struct {
@@ -53,13 +104,28 @@ type Controller struct {
 	cancel         context.CancelFunc
 	currentPalette ColorPalette
 	currentEffect  Effect
+	updateCounter int
 }
 
 func NewController() *Controller {
 	controller := &Controller{}
 	controller.RefreshNodes()
 	controller.currentContext, controller.cancel = context.WithCancel(context.Background())
+	controller.currentPalette = colorPaletteList[0]
+	controller.currentEffect = effects[0]
+
+	//go controller.updatesPerSecondCounter()
+
 	return controller
+}
+
+func (c *Controller) updatesPerSecondCounter(){
+	for {
+		time.Sleep(time.Second)
+		var ups = c.updateCounter
+		c.updateCounter = 0
+		log.Printf("ups %d\n", ups)
+	}
 }
 
 func (c *Controller) RefreshNodes() {
@@ -82,11 +148,11 @@ func (c *Controller) RefreshNodes() {
 	c.ConnectedMCUs = nodes
 }
 
-func getTypeFromLEDCount(count int) ShowCaseType {
+func getTypeFromLEDCount(count int) utils.ShowCaseType {
 	if count == 200 {
-		return ShowcaseType2
+		return utils.ShowcaseType2
 	} else if count == 188 {
-		return ShowcaseType1
+		return utils.ShowcaseType1
 	} else {
 		log.Fatalf("Unknown showcase type, led count %d", count)
 		return 0
@@ -119,11 +185,11 @@ func (c *Controller) SetPaletteId(id int) {
 }
 
 func (c *Controller) restartEffects() {
+	fmt.Printf("Restart Effect %s palette %s", c.currentEffect.Name, c.currentPalette.Name)
 	c.cancel()
 	c.currentContext, c.cancel = context.WithCancel(context.Background())
-	for _, node := range c.ConnectedMCUs {
-		go c.currentEffect.handler(c.currentContext, c.currentPalette, node.Type, node.SendWARLSDatagram)
-	}
+	colorState, onChange := c.getStateUpdater()
+	go c.currentEffect.handler(c.currentContext, c.currentPalette, colorState, onChange)
 }
 
 func (c *Controller) GetPaletteNames() []string {

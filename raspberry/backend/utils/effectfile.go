@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"fmt"
 	"github.com/lucasb-eyer/go-colorful"
 	"log"
 	"math"
@@ -190,79 +191,158 @@ func RevertLoop(colors []string) []string {
 	return result
 }
 
-func StartScanner(ctx context.Context, palette []string, showcase NodeMappings, send func(data []byte) error) error {
-	var litLeds []int
+func StartZScannerSynced(
+	ctx context.Context,
+	palette []string,
+	state ColorState,
+	onColorStateUpdate func(),
+) {
+	initColor, err := colorful.Hex(palette[0])
+	black := colorful.Color{}
 	for true {
-		for i := 0; i < showcase.CountZ; i++ {
+		for i := 0; i < state.stateSizeX; i++ {
 			select {
 			case <-ctx.Done():
-				return nil
+				return
 			default:
 			}
-			var data = generateWARLSHeader()
-			//turn off the leds from last step
-			for _, lit := range litLeds {
-				data = append(data, byte(lit), 0, 0, 0)
-			}
-			litLeds = showcase.NodesZ[i]
-
-			for _, lit := range litLeds {
-				data = append(data, byte(lit), 255, 0, 0)
-			}
-			err := send(data)
 			if err != nil {
-				return err
+				panic(err)
 			}
-			time.Sleep(time.Millisecond * 100)
-		}
-
-		for i := 0; i < showcase.CountX; i++ {
-			select {
-			case <-ctx.Done():
-				return nil
-			default:
+			if i == 0 {
+				state.fillX(state.stateSizeX-1, black)
+			} else {
+				state.fillX(i-1, black)
 			}
-			var data = generateWARLSHeader()
-			//turn off the leds from last step
-			for _, lit := range litLeds {
-				data = append(data, byte(lit), 0, 0, 0)
-			}
-			litLeds = showcase.NodesX[i]
-
-			for _, lit := range litLeds {
-				data = append(data, byte(lit), 255, 0, 0)
-			}
-			err := send(data)
-			if err != nil {
-				return err
-			}
-			time.Sleep(time.Millisecond * 100)
-		}
-		for i := 0; i < showcase.CountY; i++ {
-			select {
-			case <-ctx.Done():
-				return nil
-			default:
-			}
-			var data = generateWARLSHeader()
-			//turn off the leds from last step
-			for _, lit := range litLeds {
-				data = append(data, byte(lit), 0, 0, 0)
-			}
-			litLeds = showcase.NodesY[i]
-
-			for _, lit := range litLeds {
-				data = append(data, byte(lit), 255, 0, 0)
-			}
-			err := send(data)
-			if err != nil {
-				return err
-			}
-			time.Sleep(time.Millisecond * 100)
+			state.fillX(i, initColor)
+			onColorStateUpdate()
+			time.Sleep(time.Millisecond * defaultDelay)
 		}
 	}
+}
 
-	return nil
+func StartRainbowSynced(
+	ctx context.Context,
+	palette []string,
+	state ColorState,
+	onColorStateUpdate func(),
+) {
+	var hue float64 = 0
+	for true {
+		color := colorful.Hsv(hue, 1, 1)
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+		state.fill(color)
+		onColorStateUpdate()
+		time.Sleep(time.Millisecond * defaultDelay)
+		hue += 1
+		if hue > 360 {
+			hue = 0
+		}
+	}
+}
+
+func StartZFlowSynced(
+	ctx context.Context,
+	palette []string,
+	state ColorState,
+	onColorStateUpdate func(),
+) {
+	var paletteLen = float64(len(palette))
+	var paletteInc = paletteLen / float64(state.stateSizeZ)
+	var pos = 0.0
+
+	//at default speed it takes 10 seconds to rotate the palette pos
+	var posInc = paletteLen / 500
+
+	fmt.Printf("posinc %f", posInc)
+
+	for true {
+		pos += posInc
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+		for i := 0; i < state.stateSizeZ; i++ {
+			pos += paletteInc
+			var index = int(math.Round(pos))
+			if float64(index) >= paletteLen {
+				index = 0
+				pos -= paletteLen
+			}
+			color, err := colorful.Hex(palette[index])
+			if err != nil {
+				panic("could not parse " + palette[index])
+			}
+			state.fillZ(i, color)
+		}
+		onColorStateUpdate()
+		time.Sleep(time.Millisecond * defaultDelay)
+	}
+}
+
+func StartRainbowXFlowSynced(
+	ctx context.Context,
+	palette []string,
+	state ColorState,
+	onColorStateUpdate func(),
+) {
+	var hue float64 = 0
+	var hueInc float64 = 360.0 / float64(state.stateSizeX)
+
+	for true {
+		hue += 3
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+		for i := 0; i < state.stateSizeX; i++ {
+			hue += hueInc
+			if hue > 360 {
+				hue -= 360
+			}
+
+			color := colorful.Hsv(hue, 1, 1)
+			state.fillX(i, color)
+		}
+		onColorStateUpdate()
+		time.Sleep(time.Millisecond * defaultDelay)
+	}
+}
+
+func StartRainbowYFlowSynced(
+	ctx context.Context,
+	palette []string,
+	state ColorState,
+	onColorStateUpdate func(),
+) {
+	var hue float64 = 0
+	var hueInc float64 = 360.0 / float64(state.stateSizeY)
+
+	for true {
+		hue += 3
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+		for i := 0; i < state.stateSizeY; i++ {
+			hue += hueInc
+			if hue > 360 {
+				hue -= 360
+			}
+
+			color := colorful.Hsv(hue, 1, 1)
+			state.fillY(i, color)
+		}
+		onColorStateUpdate()
+		time.Sleep(time.Millisecond * defaultDelay)
+	}
 }
 
 func generateWARLSHeader() []byte {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/api_slider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:html';
 import 'dart:convert';
@@ -26,10 +27,35 @@ class _RoomEffectsPageState extends State<RoomEffects> {
         padding: EdgeInsets.all(16),
         child: SingleChildScrollView(
             child: Column(children: _buildPaletteSelector()))),
+    Padding(
+        padding: EdgeInsets.all(16),
+        child: SingleChildScrollView(
+            child: Column(children: _buildPaletteSelector()))),
   ]);
 
   _onPaletteSelect(int id) async {
     _sendRequest("setPalette", {'id': id.toString()});
+  }
+
+  List<Widget> _buildEffectSettings() {
+    List<Widget> widgets = [];
+
+    widgets.add(Padding(
+        padding: EdgeInsets.all(8),
+        child: Text(
+          "Settings",
+          style: TextStyle(fontSize: 30),
+        )));
+
+    widgets.add(Padding(
+        padding: EdgeInsets.all(8),
+        child: ApiSlider(
+          title: "Brightness",
+          urlApi: "/brightness",
+          min: 0,
+          max: 100
+        )));
+    return widgets;
   }
 
   List<Widget> _buildPaletteSelector() {
