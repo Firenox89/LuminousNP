@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'package:http/http.dart' as http;
 
-import 'api.dart';
+import '../data/api.dart';
 
 class ApiSlider extends StatefulWidget {
   final String title;
@@ -24,11 +25,11 @@ class _ApiSliderState extends State<ApiSlider> {
   }
 
   getValue() async {
-    value = (await request("brightness")) as double;
+    value = (await fetch("brightness")) as double;
   }
 
   setValue(double newValue) async {
-    value = (await request("brightness")) as double;
+    value = (await fetch("brightness")) as double;
   }
 
   @override

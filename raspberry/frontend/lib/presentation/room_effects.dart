@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:frontend/api_slider.dart';
+import 'package:frontend/presentation/api_slider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:html';
 import 'dart:convert';
