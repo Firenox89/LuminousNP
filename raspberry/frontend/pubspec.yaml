@@ -23,7 +23,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  http: ^0.13.0
+  http: ^0.13.6
   flex_color_picker: any
   flutter_bloc: ^7.0.0
 
